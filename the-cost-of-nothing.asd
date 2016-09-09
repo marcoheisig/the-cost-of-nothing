@@ -11,5 +11,5 @@
   :components
   ((:file "package")
    (:file "utilities" :depends-on ("package"))
-   (:file "enlighten-me!" :depends-on ("utilities"))
+   (:file "the-cost-of-nothing" :depends-on ("utilities"))
    (:static-file "COPYING")))

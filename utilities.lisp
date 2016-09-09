@@ -10,7 +10,7 @@
         (return-from runtime (/ time invocations))))))
 
 (defun measure-runtime (function &rest arguments)
-  (gc :full t)
+  (gc)
   (let ((time (get-internal-real-time))
         result)
     (unwind-protect (apply function arguments)

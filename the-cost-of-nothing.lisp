@@ -14,6 +14,8 @@
     (format t "~a~%" question)
     (funcall (symbol-function question))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (answer |What is the cost of calling a FLET?|
   (print-time
    (runtime
