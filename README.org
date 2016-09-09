@@ -1,0 +1,18 @@
+#+BEGIN_QUOTE
+A LISP programmer knows the value of everything, but the cost of nothing.
+
+--- Alan Perlis
+#+END_QUOTE
+
+This is a simple benchmark suite that tries to estimate the cost of
+individual language features of Common Lisp on a given platform and
+implementation. I hope you find it useful.
+
+To run all benchmarks, simply type
+#+BEGIN_SRC lisp :results output
+(asdf:test-system :the-cost-of-nothing)
+#+END_SRC
+or
+#+BEGIN_SRC lisp
+(the-cost-of-nothing:enlighten-me!)
+#+END_SRC
