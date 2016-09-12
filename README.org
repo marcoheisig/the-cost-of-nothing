@@ -4,10 +4,6 @@ A LISP programmer knows the value of everything, but the cost of nothing.
 --- Alan Perlis
 #+END_QUOTE
 
-#+BEGIN_QUOTE
-There are lies, damned lies and benchmarks.
-#+END_QUOTE
-
 These are some simple benchmarks to estimate the cost of individual Common
 Lisp operations on the given platform and implementation. I hope you find it
 useful.
@@ -20,3 +16,9 @@ or
 #+BEGIN_SRC lisp
 (the-cost-of-nothing:enlighten-me!)
 #+END_SRC
+
+And please do not forget:
+
+#+BEGIN_QUOTE
+There are lies, damned lies and benchmarks.
+#+END_QUOTE
