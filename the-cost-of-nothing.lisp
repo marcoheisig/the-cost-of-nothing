@@ -10,6 +10,7 @@
      (pushnew ',name *questions*)))
 
 (defun enlighten-me! ()
+  (gc :full t) ; tabula rasa
   (dolist (question (reverse *questions*))
     (format t "~a~%" question)
     (funcall (symbol-function question))
@@ -26,7 +27,8 @@
     (lambda (invocations)
       (let (tmp)
         (dotimes (i invocations)
-          (push 42 tmp)))))))
+          (push 42 tmp))
+        (touch tmp))))))
 
 (answer |What is the cost of allocating arrays?|
   (flet ((alloc-cost (bytes)
@@ -40,9 +42,26 @@
            (y0 (alloc-cost x0))
            (y1 (alloc-cost x1))
            (slope (/ (- y1 y0) (- x1 x0))))
-      (format t "~a, plus ~a per byte allocated."
+      (format t "~a, plus ~a per byte allocated.~%"
               (print-time y0 nil)
               (print-time slope nil)))))
+
+(answer |What is the cost of garbage collection?|
+  (let ((gc-0
+          (runtime
+           (lambda (invocations)
+             (dotimes (i invocations)
+               (touch (cons nil nil))
+               (gc)))))
+        (full-gc-0
+          (runtime
+           (lambda (invocations)
+             (dotimes (i invocations)
+               (touch (cons nil nil))
+               (gc :full t))))))
+    (format t "~a for a normal GC, ~a for a full GC.~%"
+            (print-time gc-0 nil)
+            (print-time full-gc-0 nil))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
