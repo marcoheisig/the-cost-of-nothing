@@ -19,32 +19,37 @@
                            'double-float)))
     result))
 
-(defun print-time (time &optional (stream *standard-output*))
+(defun time-string (time)
   (cond
     ((< time 1.d-6)
-     (format stream "~,2F nanoseconds" (* time 1.d9)))
+     (format nil "~,2F nanoseconds" (* time 1.d9)))
     ((< time 1.d-3)
-     (format stream "~,2F microseconds" (* time 1.d6)))
+     (format nil "~,2F microseconds" (* time 1.d6)))
     ((< time 1.d-0)
-     (format stream "~,2F milliseconds" (* time 1.d3)))
+     (format nil "~,2F milliseconds" (* time 1.d3)))
     (t
-     (format stream "~,2F seconds" time))))
+     (format nil "~,2F seconds" time))))
 
-(defmacro unroll ((var n &optional (unroll 4)) &body body)
+(defun flops-string (flops)
+  (cond
+    ((> flops 1.d11)
+     (format nil "~,2F terraFLOPS" (/ flops 1.d12)))
+    ((> flops 1.d8)
+     (format nil "~,2F gigaFLOPS" (/ flops 1.d9)))
+    ((> flops 1.d5)
+     (format nil "~,2F megaFLOPS" (/ flops 1.d6)))
+    ((> flops 1.d2)
+     (format nil "~,2F kiloFLOPS" (/ flops 1.d3)))
+    (t
+     (format nil "~,2F FLOPS" flops))))
+
+(defmacro unroll ((var &optional (unroll 4)) &body body)
   "Similar to DOTIMES."
-  (once-only (n)
-    (with-gensyms (remainder i)
-      `(let ((,remainder (rem ,n ,unroll)))
-         (do ((,i 0 (+ ,i ,unroll)))
-             ((>= ,i (- ,n ,remainder)))
-           (declare (type fixnum ,i))
-           ,@(loop for offset below unroll
-                   collect
-                   `(let ((,var (+ ,i ,offset)))
-                      ,@body)))
-         (do ((,var (- ,n ,remainder) (+ ,var 1)))
-             ((>= ,var ,n))
-           ,@body)))))
+  `(progn
+     ,@(loop for offset below unroll
+             collect
+             `(let ((,var (+ ,var ,offset)))
+                ,@body))))
 
 (declaim (notinline touch))
 (defun touch (object)
