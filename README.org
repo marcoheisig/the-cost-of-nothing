@@ -17,8 +17,8 @@ or
 (the-cost-of-nothing:enlighten-me!)
 #+END_SRC
 
-And please do not forget:
+And please do not forget
 
 #+BEGIN_QUOTE
-There are lies, damned lies and benchmarks.
+There are lies, damned lies, and benchmarks.
 #+END_QUOTE

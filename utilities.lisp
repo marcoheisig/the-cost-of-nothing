@@ -6,7 +6,7 @@
   (do ((invocations 1 (* 2 invocations)))
       ((> invocations (expt 2 30)) 0.0d0)
     (let ((time (funcall-time f invocations)))
-      (when (> time 0.1)
+      (when (> time (* 20 (/ internal-time-units-per-second)))
         (return-from runtime (/ time invocations))))))
 
 (defun funcall-time (function &rest arguments)
@@ -42,14 +42,6 @@
      (format nil "~,2F kiloFLOPS" (/ flops 1.d3)))
     (t
      (format nil "~,2F FLOPS" flops))))
-
-(defmacro unroll ((var &optional (unroll 4)) &body body)
-  "Similar to DOTIMES."
-  `(progn
-     ,@(loop for offset below unroll
-             collect
-             `(let ((,var (+ ,var ,offset)))
-                ,@body))))
 
 (declaim (notinline touch))
 (defun touch (object)

@@ -21,6 +21,18 @@
 ;;;
 ;;; core functionality
 
+;; TODO compute allocation and deallocation cost for conses and arrays
+
+(answer |What Lisp system is this?|
+  (format t "~:[Something weird~;~:*~a~]"
+          (lisp-implementation-type))
+  (format t "~@[ ~a~]"
+          (lisp-implementation-version))
+  (format t ", running on a ~:[strange system~;~:*~a~]"
+          (machine-type))
+  (format t "~@[ ~a~].~%"
+          (machine-version)))
+
 (answer |What is the cost of calling CONS?|
   (format t "~a.~%"
           (time-string
@@ -106,6 +118,8 @@
               (time-string 0-arg-cost)
               (time-string slope)))))
 
+;; TODO more CLOS benchmarks
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; lists and sequences
@@ -188,7 +202,11 @@
 (defmacro define-number-cruncher (name type coefficient)
   `(defun ,name (length a b c)
      (declare
-      (optimize (speed 3) (safety 0) (debug 0))
+      (optimize (speed 3)
+                (safety 0)
+                (debug 0)
+                (compilation-speed 0)
+                (space 0))
       (type (simple-array ,type (*)) a b c))
      (loop for i fixnum below length do
        (setf (aref c i) (* (+ (aref a i) (aref b i))
