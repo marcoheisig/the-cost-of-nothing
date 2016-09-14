@@ -21,8 +21,6 @@
 ;;;
 ;;; core functionality
 
-;; TODO compute allocation and deallocation cost for conses and arrays
-
 (answer |What Lisp system is this?|
   (format t "~:[Something weird~;~:*~a~]"
           (lisp-implementation-type))
@@ -33,31 +31,79 @@
   (format t "~@[ ~a~].~%"
           (machine-version)))
 
-(answer |What is the cost of calling CONS?|
-  (format t "~a.~%"
-          (time-string
+(answer |What is the cost of allocating objects?|
+  (flet ((array-cost (bytes)
+           (runtime
+            (lambda (invocations)
+              (dotimes (i invocations)
+                (touch
+                 (make-array
+                  bytes
+                  :element-type '(unsigned-byte 8)))))))
+         (cons-cost ()
            (runtime
             (lambda (invocations)
               (let (tmp)
                 (dotimes (i invocations)
                   (push 42 tmp))
-                (touch tmp)))))))
-
-(answer |What is the cost of allocating arrays?|
-  (flet ((alloc-cost (bytes)
+                (touch tmp)))))
+         (struct-cost (constructor)
            (runtime
             (lambda (invocations)
               (dotimes (i invocations)
-                (touch
-                 (make-array bytes :element-type '(unsigned-byte 8))))))))
+                (touch (funcall constructor))))))
+         (class-cost (class)
+           (runtime
+            (lambda (invocations)
+              (dotimes (i invocations)
+                (touch (make-instance class)))))))
+    ;; TODO compute GC deallocation cost
+    (format t "~a for allocating conses.~%"
+            (time-string (cons-cost)))
     (let* ((x0 4)
            (x1 100000)
-           (y0 (alloc-cost x0))
-           (y1 (alloc-cost x1))
+           (y0 (array-cost x0))
+           (y1 (array-cost x1))
            (slope (/ (- y1 y0) (- x1 x0))))
-      (format t "~a, plus ~a per byte allocated.~%"
+      (format t "~a, plus ~a per byte for allocating arrays.~%"
+              (time-string y0)
+              (time-string slope)))
+    (let* ((y0 (struct-cost #'make-0-slot-struct))
+           (y50 (struct-cost #'make-50-slot-struct))
+           (slope (/ (- y50 y0) 200)))
+      (format t "~a, plus ~a per slot for allocating structs.~%"
+              (time-string y0)
+              (time-string slope)))
+    (let* ((y0 (class-cost (find-class '0-slot-class)))
+           (y50 (class-cost (find-class '50-slot-class)))
+           (slope (/ (- y50 y0) 50)))
+      (format t "~a, plus ~a per slot for instantiating classes.~%"
               (time-string y0)
               (time-string slope)))))
+
+(defmacro n-slot-struct (name n)
+  (let ((slots
+          (loop for i below n
+                collect
+                `(,(intern (format nil "SLOT-~d" i))
+                  0 :type fixnum))))
+    `(defstruct ,name ,@slots)))
+
+(n-slot-struct 0-slot-struct 0)
+
+(n-slot-struct 50-slot-struct 50)
+
+(defmacro n-slot-class (name n)
+  (let ((slots
+          (loop for i below n
+                collect
+                `(,(intern (format nil "SLOT-~d" i))
+                  :type fixnum :initform 0))))
+    `(defclass ,name () ,slots)))
+
+(n-slot-class 0-slot-class  0)
+
+(n-slot-class 50-slot-class 50)
 
 (answer |What is the cost of garbage collection?|
   (let ((gc-0
@@ -76,10 +122,6 @@
             (time-string gc-0)
             (time-string full-gc-0))))
 
-(declaim (notinline binary-defun))
-(defun binary-defun (a b)
-  (declare (ignore a b)))
-
 (answer |What is the cost of calling a DEFUN?|
   (format t "~a.~%"
           (time-string
@@ -88,18 +130,16 @@
               (dotimes (i invocations)
                 (binary-defun i i)))))))
 
+(declaim (notinline binary-defun))
+(defun binary-defun (a b)
+  (declare (ignore a b)))
+
+(answer |What is the cost of checking for equality?|
+  )
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; CLOS
-
-(defmacro n-arg-defmethod (name n)
-  (let ((args (loop for i below n collect (gensym))))
-    `(defgeneric ,name (,@args)
-       (:method (,@args) (declare (ignore ,@args))))))
-
-(n-arg-defmethod 0-arg-defmethod 0)
-
-(n-arg-defmethod 50-arg-defmethod 50)
 
 (answer |What is the cost of calling a DEFMETHOD?|
   (let* ((0-arg-cost
@@ -118,18 +158,20 @@
               (time-string 0-arg-cost)
               (time-string slope)))))
 
+(defmacro n-arg-defmethod (name n)
+  (let ((args (loop for i below n collect (gensym))))
+    `(defgeneric ,name (,@args)
+       (:method (,@args) (declare (ignore ,@args))))))
+
+(n-arg-defmethod 0-arg-defmethod 0)
+
+(n-arg-defmethod 50-arg-defmethod 50)
+
 ;; TODO more CLOS benchmarks
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; lists and sequences
-
-(defun find-runtime (sequence)
-  (let ((item #\!))
-    (runtime
-     (lambda (invocations)
-       (dotimes (i invocations)
-         (find item sequence))))))
 
 (answer |What is the cost of FINDing things?|
   (let* ((length 100)
@@ -144,26 +186,16 @@
     (format t "~a per element of of a vector.~%"
             (time-string (/ (find-runtime vector) length)))))
 
+(defun find-runtime (sequence)
+  (let ((item #\!))
+    (runtime
+     (lambda (invocations)
+       (dotimes (i invocations)
+         (find item sequence))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; hash tables
-
-(defun hash-runtime (test keys)
-  (let ((hash-table (make-hash-table :test test))
-        (keys (apply #'vector keys)))
-    (loop for key across keys do
-      (setf (gethash key hash-table) nil))
-    (let ((keys (shuffle keys))
-          tmp)
-      (values
-       (runtime
-        (lambda (invocations)
-          (declare (type fixnum invocations)
-                   (type (simple-array t (*)) keys))
-          (dotimes (i (floor invocations (length keys)))
-            (dotimes (i (length keys))
-              (setf tmp (gethash (svref keys i) hash-table))))))
-       tmp))))
 
 (answer |What is the cost of a hash table lookup?|
   (let ((eq (hash-runtime #'eq (iota 40)))
@@ -191,6 +223,23 @@
             (time-string
              (/ (- equalp-100 equalp-0) 100)))))
 
+(defun hash-runtime (test keys)
+  (let ((hash-table (make-hash-table :test test))
+        (keys (apply #'vector keys)))
+    (loop for key across keys do
+      (setf (gethash key hash-table) nil))
+    (let ((keys (shuffle keys))
+          tmp)
+      (values
+       (runtime
+        (lambda (invocations)
+          (declare (type fixnum invocations)
+                   (type (simple-array t (*)) keys))
+          (dotimes (i (floor invocations (length keys)))
+            (dotimes (i (length keys))
+              (setf tmp (gethash (svref keys i) hash-table))))))
+       tmp))))
+
 ;; TODO hash table versus alist
 
 ;; TODO hash table rehash cost
@@ -198,6 +247,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; number crunching
+
+(answer |How many floating-point operations can this system do per second?|
+  (format t "~a in single precision and ~a in double precision.~%"
+          (flops-string (max (flops 'single-float)
+                             (flops '(complex single-float))))
+          (flops-string (max (flops 'double-float)
+                             (flops '(complex double-float))))))
 
 (defmacro define-number-cruncher (name type coefficient)
   `(defun ,name (length a b c)
@@ -244,10 +300,3 @@
                        ((complex double-float) #'crunch-c64))))
               (funcall f length a1 a1 a2)
               (funcall f length a2 a2 a1)))))))))
-
-(answer |How many floating-point operations can this system do per second?|
-  (format t "~a in single precision and ~a in double precision.~%"
-          (flops-string (max (flops 'single-float)
-                             (flops '(complex single-float))))
-          (flops-string (max (flops 'double-float)
-                             (flops '(complex double-float))))))
