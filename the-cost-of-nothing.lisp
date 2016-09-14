@@ -229,7 +229,7 @@
   `(defun ,name (length a b c)
      (declare
       (optimize (speed 3)
-                (safety 0)
+                #-ccl(safety 0) #+ccl(safety 3)
                 (debug 0)
                 (compilation-speed 0)
                 (space 0))
