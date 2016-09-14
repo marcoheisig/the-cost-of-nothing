@@ -32,34 +32,13 @@
           (machine-version)))
 
 (answer |What is the cost of allocating objects?|
+  (format t "~a for allocating conses.~%"
+          (time-string (run-time (cons nil nil))))
   (flet ((array-cost (bytes)
-           (runtime
-            (lambda (invocations)
-              (dotimes (i invocations)
-                (touch
-                 (make-array
-                  bytes
-                  :element-type '(unsigned-byte 8)))))))
-         (cons-cost ()
-           (runtime
-            (lambda (invocations)
-              (let (tmp)
-                (dotimes (i invocations)
-                  (push 42 tmp))
-                (touch tmp)))))
-         (struct-cost (constructor)
-           (runtime
-            (lambda (invocations)
-              (dotimes (i invocations)
-                (touch (funcall constructor))))))
-         (class-cost (class)
-           (runtime
-            (lambda (invocations)
-              (dotimes (i invocations)
-                (touch (make-instance class)))))))
-    ;; TODO compute GC deallocation cost
-    (format t "~a for allocating conses.~%"
-            (time-string (cons-cost)))
+           (run-time
+             (make-array
+              bytes
+              :element-type '(unsigned-byte 8)))))
     (let* ((x0 4)
            (x1 100000)
            (y0 (array-cost x0))
@@ -67,19 +46,19 @@
            (slope (/ (- y1 y0) (- x1 x0))))
       (format t "~a, plus ~a per byte for allocating arrays.~%"
               (time-string y0)
-              (time-string slope)))
-    (let* ((y0 (struct-cost #'make-0-slot-struct))
-           (y50 (struct-cost #'make-50-slot-struct))
-           (slope (/ (- y50 y0) 200)))
-      (format t "~a, plus ~a per slot for allocating structs.~%"
-              (time-string y0)
-              (time-string slope)))
-    (let* ((y0 (class-cost (find-class '0-slot-class)))
-           (y50 (class-cost (find-class '50-slot-class)))
-           (slope (/ (- y50 y0) 50)))
-      (format t "~a, plus ~a per slot for instantiating classes.~%"
-              (time-string y0)
-              (time-string slope)))))
+              (time-string slope))))
+  (let* ((y0 (run-time (make-0-slot-struct)))
+         (y50 (run-time (make-50-slot-struct)))
+         (slope (/ (- y50 y0) 50)))
+    (format t "~a, plus ~a per slot for allocating structs.~%"
+            (time-string y0)
+            (time-string slope)))
+  (let* ((y0 (run-time (make-instance '0-slot-class)))
+         (y50 (run-time (make-instance '50-slot-class)))
+         (slope (/ (- y50 y0) 50)))
+    (format t "~a, plus ~a per slot for instantiating classes.~%"
+            (time-string y0)
+            (time-string slope))))
 
 (defmacro n-slot-struct (name n)
   (let ((slots
@@ -106,57 +85,48 @@
 (n-slot-class 50-slot-class 50)
 
 (answer |What is the cost of garbage collection?|
-  (let ((gc-0
-          (runtime
-           (lambda (invocations)
-             (dotimes (i invocations)
-               (touch (cons nil nil))
-               (gc)))))
-        (full-gc-0
-          (runtime
-           (lambda (invocations)
-             (dotimes (i invocations)
-               (touch (cons nil nil))
-               (gc :full t))))))
-    (format t "~a for a normal GC, ~a for a full GC.~%"
-            (time-string gc-0)
-            (time-string full-gc-0))))
-
-(answer |What is the cost of calling a DEFUN?|
-  (format t "~a.~%"
+  (format t "~a for a normal GC, ~a for a full GC.~%"
           (time-string
-           (runtime
-            (lambda (invocations)
-              (dotimes (i invocations)
-                (binary-defun i i)))))))
+           (run-time
+             (prog1 (touch (cons nil nil))
+               (gc))))
+          (time-string
+           (run-time
+             (prog1 (touch (cons nil nil))
+               (gc :full t))))))
 
-(declaim (notinline binary-defun))
-(defun binary-defun (a b)
-  (declare (ignore a b)))
-
-(answer |What is the cost of checking for equality?|
-  )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; CLOS
-
-(answer |What is the cost of calling a DEFMETHOD?|
+(answer |What is the cost of a function call?|
   (let* ((0-arg-cost
-           (runtime
-            (lambda (invocations)
-              (dotimes (i invocations)
-                (0-arg-defmethod)))))
-         (50-args (iota 50))
+           (run-time
+             (0-arg-defun)))
          (50-arg-cost
-           (runtime
-            (lambda (invocations)
-              (dotimes (i invocations)
-                (apply #'50-arg-defmethod 50-args))))))
-    (let ((slope (/ (- 50-arg-cost 0-arg-cost) 50)))
-      (format t "~a plus ~a per argument.~%"
-              (time-string 0-arg-cost)
-              (time-string slope)))))
+           (run-time
+             (apply #'50-arg-defun '#.(iota 50))))
+         (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
+    (format t "~a plus ~a per argument for calling a DEFUN.~%"
+            (time-string 0-arg-cost)
+            (time-string slope)))
+  (let* ((0-arg-cost
+           (run-time
+             (0-arg-defmethod)))
+         (50-arg-cost
+           (run-time
+             (apply #'50-arg-defmethod '#.(iota 50))))
+         (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
+    (format t "~a plus ~a per argument for calling a DEFMETHOD.~%"
+            (time-string 0-arg-cost)
+            (time-string slope))))
+
+(defmacro n-arg-defun (name n)
+  (let ((args (loop for i below n collect (gensym))))
+    `(progn
+       (declaim (notinline ,name))
+       (defun ,name (,@args)
+         (declare (ignore ,@args))))))
+
+(n-arg-defun 0-arg-defun 0)
+
+(n-arg-defun 50-arg-defun 50)
 
 (defmacro n-arg-defmethod (name n)
   (let ((args (loop for i below n collect (gensym))))
@@ -167,7 +137,10 @@
 
 (n-arg-defmethod 50-arg-defmethod 50)
 
-;; TODO more CLOS benchmarks
+(answer |What is the cost of checking for equality?|
+  )
+
+;; TODO CLOS benchmarks
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -180,36 +153,33 @@
          (list (make-list length))
          (vector (make-array length :initial-element nil)))
     (format t "~a per character of a string.~%"
-            (time-string (/ (find-runtime string) length)))
+            (time-string (/ (find-run-time string) length)))
     (format t "~a per item in a list.~%"
-            (time-string (/ (find-runtime list) length)))
+            (time-string (/ (find-run-time list) length)))
     (format t "~a per element of of a vector.~%"
-            (time-string (/ (find-runtime vector) length)))))
+            (time-string (/ (find-run-time vector) length)))))
 
-(defun find-runtime (sequence)
-  (let ((item #\!))
-    (runtime
-     (lambda (invocations)
-       (dotimes (i invocations)
-         (find item sequence))))))
+(defun find-run-time (sequence)
+  (run-time
+    (find #\! sequence)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; hash tables
 
 (answer |What is the cost of a hash table lookup?|
-  (let ((eq (hash-runtime #'eq (iota 40)))
-        (eql (hash-runtime #'eql (iota 40)))
-        (equal-0 (hash-runtime #'equal (iota 40)))
+  (let ((eq (hash-run-time #'eq (iota 40)))
+        (eql (hash-run-time #'eql (iota 40)))
+        (equal-0 (hash-run-time #'equal (iota 40)))
         (equal-100
           (let ((keys (loop for i below 40
                             collect (make-list 100 :initial-element i))))
-            (hash-runtime #'equal keys)))
-        (equalp-0 (hash-runtime #'equalp (iota 40)))
+            (hash-run-time #'equal keys)))
+        (equalp-0 (hash-run-time #'equalp (iota 40)))
         (equalp-100
           (let ((keys (loop for i below 40
                             collect (make-list 100 :initial-element i))))
-            (hash-runtime #'equalp keys))))
+            (hash-run-time #'equalp keys))))
     (format t "~a for an EQ hash table.~%"
             (time-string eq))
     (format t "~a for an EQL hash table.~%"
@@ -223,7 +193,7 @@
             (time-string
              (/ (- equalp-100 equalp-0) 100)))))
 
-(defun hash-runtime (test keys)
+(defun hash-run-time (test keys)
   (let ((hash-table (make-hash-table :test test))
         (keys (apply #'vector keys)))
     (loop for key across keys do
@@ -231,7 +201,7 @@
     (let ((keys (shuffle keys))
           tmp)
       (values
-       (runtime
+       (benchmark
         (lambda (invocations)
           (declare (type fixnum invocations)
                    (type (simple-array t (*)) keys))
@@ -285,7 +255,7 @@
               :element-type element-type
               :initial-element initial-element)))
     (/
-     (runtime
+     (benchmark
       (lambda (invocations)
         (let* ((flop/traversal
                  (cond

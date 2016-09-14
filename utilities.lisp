@@ -2,15 +2,22 @@
 
 (in-package :the-cost-of-nothing)
 
-(defun runtime (f)
+(defun benchmark (f+overhead &optional (overhead #'identity))
+  (gc) ; expensive, but crucial for reasonable results
+  (let* ((before (%benchmark overhead))
+         (time (%benchmark f+overhead))
+         (after (%benchmark overhead)))
+    (- time (* (+ before after) 0.5d0))))
+
+(defun %benchmark (f)
   (do ((invocations 1 (* 2 invocations)))
       ((> invocations (expt 2 30)) 0.0d0)
     (let ((time (funcall-time f invocations)))
       (when (> time (* 20 (/ internal-time-units-per-second)))
-        (return-from runtime (/ time invocations))))))
+        (return-from %benchmark
+          (/ time invocations))))))
 
 (defun funcall-time (function &rest arguments)
-  (gc) ; expensive, but crucial for reasonable results
   (let ((time (get-internal-real-time))
         result)
     (unwind-protect (apply function arguments)
@@ -18,6 +25,16 @@
                               internal-time-units-per-second)
                            'double-float)))
     result))
+
+(defmacro run-time (form)
+  (with-gensyms (invocations i)
+    `(benchmark
+      (lambda (,invocations)
+        (dotimes (,i ,invocations)
+          (touch ,form)))
+      (lambda (invocations)
+        (dotimes (i invocations)
+          (touch nil))))))
 
 (defun time-string (time)
   (cond
