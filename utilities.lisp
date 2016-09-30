@@ -2,29 +2,49 @@
 
 (in-package :the-cost-of-nothing)
 
-(defun benchmark (f+overhead &optional (overhead #'identity))
+(defun benchmark (f-plus-overhead &optional (overhead #'identity))
+  "The function F-PLUS-OVERHEAD must invoke a certain operation N times for
+any given integer N. The function OVERHEAD should execute the same code,
+but without this operation. BENCHMARK returns a double-float describing the
+average duration of one such operation in seconds."
   (gc) ; expensive, but crucial for reasonable results
-  (let* ((before (%benchmark overhead))
-         (time (%benchmark f+overhead))
-         (after (%benchmark overhead)))
-    (- time (* (+ before after) 0.5d0))))
+  (let* ((overhead (%benchmark overhead))
+         (time (%benchmark f-plus-overhead)))
+    (max (- time overhead) 0.0d0)))
+
+(defparameter *minimum-sampling-time*
+  (* 40 (/ internal-time-units-per-second)))
 
 (defun %benchmark (f)
-  (do ((invocations 1 (* 2 invocations)))
-      ((> invocations (expt 2 30)) 0.0d0)
-    (let ((time (funcall-time f invocations)))
-      (when (> time (* 20 (/ internal-time-units-per-second)))
-        (return-from %benchmark
-          (/ time invocations))))))
+  (let ((invocations 1)
+        (time 0.0d0))
+    (loop
+      (setf time (funcall-time f invocations))
+
+      ;; stopping criterium #1: enough sampling time
+      (when (> time *minimum-sampling-time*)
+        (return (/ time invocations)))
+
+      ;; increase the number of invocations
+      (setf invocations
+            (if (zerop time)
+                (* invocations 2)
+                (* invocations
+                   (ceiling (* 1.1 *minimum-sampling-time*)
+                            time))))
+
+      ;; stopping criterium #2: insanely many invocations
+      (when (> invocations most-positive-fixnum)
+        (return 0.0d0)))))
 
 (defun funcall-time (function &rest arguments)
-  (let ((time (get-internal-real-time))
-        result)
-    (unwind-protect (apply function arguments)
-      (setf result (coerce (/ (- (get-internal-real-time) time)
-                              internal-time-units-per-second)
-                           'double-float)))
-    result))
+  "Naively measure the time it takes to invoke FUNCTION with the given
+ARGUMENTS. Returns the run time in seconds as a double-float."
+  (let ((time (get-internal-real-time)))
+    (apply function arguments)
+    (coerce (/ (- (get-internal-real-time) time)
+               internal-time-units-per-second)
+            'double-float)))
 
 (defmacro run-time (form)
   (with-gensyms (invocations i)
@@ -32,8 +52,8 @@
       (lambda (,invocations)
         (dotimes (,i ,invocations)
           (touch ,form)))
-      (lambda (invocations)
-        (dotimes (i invocations)
+      (lambda (,invocations)
+        (dotimes (,i ,invocations)
           (touch nil))))))
 
 (defun time-string (time)
@@ -62,6 +82,6 @@
 
 (declaim (notinline touch))
 (defun touch (object)
-  "Essentially equivalent to IDENTITY, but prevents OBJECT from being
-  allocated on the stack of the caller."
+  "Essentially equivalent to IDENTITY, but protects OBJECT from compiler
+  optimizations."
   object)

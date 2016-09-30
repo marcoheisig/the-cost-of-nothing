@@ -101,21 +101,44 @@
              (0-arg-defun)))
          (50-arg-cost
            (run-time
-             (apply #'50-arg-defun '#.(iota 50))))
+            (apply #'50-arg-defun '#.(iota 50))))
          (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
     (format t "~a plus ~a per argument for calling a DEFUN.~%"
             (time-string 0-arg-cost)
             (time-string slope)))
+
+  ;; call each defmethod several times before benchmarking it to give CLOS
+  ;; time to set up its stuff
+  (loop repeat 100 do (touch (0-arg-defmethod)))
+  (loop repeat 100 do (touch (apply #'50-arg-defmethod '#.(iota 50))))
   (let* ((0-arg-cost
            (run-time
              (0-arg-defmethod)))
          (50-arg-cost
            (run-time
-             (apply #'50-arg-defmethod '#.(iota 50))))
+            (apply #'50-arg-defmethod '#.(iota 50))))
          (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
     (format t "~a plus ~a per argument for calling a DEFMETHOD.~%"
             (time-string 0-arg-cost)
-            (time-string slope))))
+            (time-string slope)))
+  (macrolet ((keyword-args (n)
+               `',(loop for i below n
+                        append
+                        (list
+                         (make-keyword
+                          (format  nil "KEYWORD-~d" i))
+                         i))))
+    (let* ((1-keyword-defun-cost
+             (run-time
+              (apply #'1-keyword-defun (keyword-args 1))))
+           (20-keyword-defun-cost
+             (run-time
+              (apply #'20-keyword-defun (keyword-args 20))))
+           (slope (/ (- 20-keyword-defun-cost
+                        1-keyword-defun-cost)
+                     19)))
+      (format t "~a per keyword argument.~%"
+              (time-string slope)))))
 
 (defmacro n-arg-defun (name n)
   (let ((args (loop for i below n collect (gensym))))
@@ -124,23 +147,41 @@
        (defun ,name (,@args)
          (declare (ignore ,@args))))))
 
-(n-arg-defun 0-arg-defun 0)
-
-(n-arg-defun 50-arg-defun 50)
-
 (defmacro n-arg-defmethod (name n)
   (let ((args (loop for i below n collect (gensym))))
     `(defgeneric ,name (,@args)
        (:method (,@args) (declare (ignore ,@args))))))
 
+(defmacro n-keyword-defun (name n)
+  (let ((args (loop for i below n
+                    collect
+                    (make-symbol
+                     (format nil "KEYWORD-~d" i)))))
+    `(defun ,name (&key ,@args)
+       (and ,@args))))
+
+(defmacro n-keyword-defun (name n)
+  (let ((args (loop for i below n
+                    collect
+                    (make-symbol
+                     (format nil "KEYWORD-~d" i)))))
+    `(defun ,name (&key ,@args)
+       (or ,@args))))
+
+(n-arg-defun 0-arg-defun 0)
+
+(n-arg-defun 50-arg-defun 50)
+
 (n-arg-defmethod 0-arg-defmethod 0)
 
 (n-arg-defmethod 50-arg-defmethod 50)
 
-(answer |What is the cost of checking for equality?|
-  )
+(n-keyword-defun 1-keyword-defun 1)
 
-;; TODO CLOS benchmarks
+(n-keyword-defun 20-keyword-defun 20)
+
+(answer |What is the cost of accessing a SLOT?|
+  (format t "No idea yet - TODO."))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -198,21 +239,20 @@
         (keys (apply #'vector keys)))
     (loop for key across keys do
       (setf (gethash key hash-table) nil))
-    (let ((keys (shuffle keys))
-          tmp)
-      (values
-       (benchmark
-        (lambda (invocations)
-          (declare (type fixnum invocations)
-                   (type (simple-array t (*)) keys))
-          (dotimes (i (floor invocations (length keys)))
-            (dotimes (i (length keys))
-              (setf tmp (gethash (svref keys i) hash-table))))))
-       tmp))))
-
-;; TODO hash table versus alist
-
-;; TODO hash table rehash cost
+    (let ((keys (shuffle keys)))
+      (benchmark
+       (lambda (invocations)
+         (declare (type fixnum invocations)
+                  (type (simple-array t (*)) keys))
+         (dotimes (i (floor invocations (length keys)))
+           (dotimes (i (length keys))
+             (touch (gethash (svref keys i) hash-table)))))
+       (lambda (invocations)
+         (declare (type fixnum invocations)
+                  (type (simple-array t (*)) keys))
+         (dotimes (i (floor invocations (length keys)))
+           (dotimes (i (length keys))
+             (touch (svref keys i)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
