@@ -158,14 +158,6 @@
                     (make-symbol
                      (format nil "KEYWORD-~d" i)))))
     `(defun ,name (&key ,@args)
-       (and ,@args))))
-
-(defmacro n-keyword-defun (name n)
-  (let ((args (loop for i below n
-                    collect
-                    (make-symbol
-                     (format nil "KEYWORD-~d" i)))))
-    `(defun ,name (&key ,@args)
        (or ,@args))))
 
 (n-arg-defun 0-arg-defun 0)
@@ -180,8 +172,22 @@
 
 (n-keyword-defun 20-keyword-defun 20)
 
+(defclass some-class ()
+  ((slot-1 :accessor slot-1 :initform 42)))
+
+(defstruct some-struct
+  (slot-1 42))
+
 (answer |What is the cost of accessing a SLOT?|
-  (format t "No idea yet - TODO."))
+  (let* ((struct (make-some-struct))
+         (class (make-instance 'some-class))
+         (struct-cost
+           (run-time (some-struct-slot-1 struct)))
+         (class-cost
+           (run-time (slot-1 class))))
+    (format t "~a for a struct, ~a for a class."
+            (time-string struct-cost)
+            (time-string class-cost))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
