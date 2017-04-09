@@ -25,7 +25,7 @@ To measure only certain parts of an expression, type
 (nested-benchmark
   (foo)
   (bar)
-  (SUBEXPRESSION1)
+  (benchmark SUBEXPRESSION1)
   (let ((a (baz)))
     (benchmark SUBEXPRESSION2)))
 #+END_SRC
