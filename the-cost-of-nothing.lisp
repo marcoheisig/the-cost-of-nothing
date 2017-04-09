@@ -9,10 +9,15 @@
      (defun ,name () ,@body)
      (pushnew ',name *questions*)))
 
+(defun display (format &rest args)
+  (apply #'format t format args)
+  (finish-output))
+
 (defun enlighten-me! ()
   (gc :full t) ; tabula rasa
   (dolist (question (reverse *questions*))
-    (format t "~a~%" question)
+    (fresh-line)
+    (display "~a~%" question)
     (funcall (symbol-function question))
     (fresh-line)
     (terpri)))
@@ -22,43 +27,49 @@
 ;;; core functionality
 
 (answer |What Lisp system is this?|
-  (format t "~:[Something weird~;~:*~a~]"
-          (lisp-implementation-type))
-  (format t "~@[ ~a~]"
-          (lisp-implementation-version))
-  (format t ", running on a ~:[strange system~;~:*~a~]"
-          (machine-type))
-  (format t "~@[ ~a~].~%"
-          (machine-version)))
+  (display "~:[Something weird~;~:*~a~]"
+           (lisp-implementation-type))
+  (display "~@[ ~a~]"
+           (lisp-implementation-version))
+  (display ", running on a ~:[strange system~;~:*~a~]"
+           (machine-type))
+  (display "~@[ ~a~].~%"
+           (machine-version)))
 
 (answer |What is the cost of allocating objects?|
-  (format t "~a for allocating conses.~%"
-          (time-string (run-time (cons nil nil))))
+  ;; CONS
+  (display "~a for allocating conses.~%"
+           (as-time
+            (trivial-benchmark
+             (cons nil nil))))
+  ;; MAKE-ARRAY
   (flet ((array-cost (bytes)
-           (run-time
-             (make-array
-              bytes
-              :element-type '(unsigned-byte 8)))))
+           (trivial-benchmark
+            (make-array
+             bytes
+             :element-type '(unsigned-byte 8)))))
     (let* ((x0 4)
            (x1 100000)
            (y0 (array-cost x0))
            (y1 (array-cost x1))
            (slope (/ (- y1 y0) (- x1 x0))))
-      (format t "~a, plus ~a per byte for allocating arrays.~%"
-              (time-string y0)
-              (time-string slope))))
-  (let* ((y0 (run-time (make-0-slot-struct)))
-         (y50 (run-time (make-50-slot-struct)))
+      (display "~a, plus ~a per byte for allocating arrays.~%"
+               (as-time y0)
+               (as-time slope))))
+  ;; MAKE-STRUCT
+  (let* (( y0 (trivial-benchmark (make-0-slot-struct)))
+         (y50 (trivial-benchmark (make-50-slot-struct)))
          (slope (/ (- y50 y0) 50)))
-    (format t "~a, plus ~a per slot for allocating structs.~%"
-            (time-string y0)
-            (time-string slope)))
-  (let* ((y0 (run-time (make-instance '0-slot-class)))
-         (y50 (run-time (make-instance '50-slot-class)))
+    (display "~a, plus ~a per slot for allocating structs.~%"
+             (as-time y0)
+             (as-time slope)))
+  ;; MAKE-INSTANCE
+  (let* (( y0 (trivial-benchmark (make-instance '0-slot-class)))
+         (y50 (trivial-benchmark (make-instance '50-slot-class)))
          (slope (/ (- y50 y0) 50)))
-    (format t "~a, plus ~a per slot for instantiating classes.~%"
-            (time-string y0)
-            (time-string slope))))
+    (display "~a, plus ~a per slot for instantiating classes.~%"
+             (as-time y0)
+             (as-time slope))))
 
 (defmacro n-slot-struct (name n)
   (let ((slots
@@ -85,42 +96,42 @@
 (n-slot-class 50-slot-class 50)
 
 (answer |What is the cost of garbage collection?|
-  (format t "~a for a normal GC, ~a for a full GC.~%"
-          (time-string
-           (run-time
+  (display "~a for a normal GC, ~a for a full GC.~%"
+           (as-time
+            (trivial-benchmark
              (prog1 (touch (cons nil nil))
                (gc))))
-          (time-string
-           (run-time
+           (as-time
+            (trivial-benchmark
              (prog1 (touch (cons nil nil))
                (gc :full t))))))
 
 (answer |What is the cost of a function call?|
   (let* ((0-arg-cost
-           (run-time
-             (0-arg-defun)))
+           (trivial-benchmark
+            (0-arg-defun)))
          (50-arg-cost
-           (run-time
+           (trivial-benchmark
             (apply #'50-arg-defun '#.(iota 50))))
          (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
-    (format t "~a plus ~a per argument for calling a DEFUN.~%"
-            (time-string 0-arg-cost)
-            (time-string slope)))
+    (display "~a plus ~a per argument for calling a DEFUN.~%"
+             (as-time 0-arg-cost)
+             (as-time slope)))
 
   ;; call each defmethod several times before benchmarking it to give CLOS
   ;; time to set up its stuff
   (loop repeat 100 do (touch (0-arg-defmethod)))
   (loop repeat 100 do (touch (apply #'50-arg-defmethod '#.(iota 50))))
   (let* ((0-arg-cost
-           (run-time
-             (0-arg-defmethod)))
+           (trivial-benchmark
+            (0-arg-defmethod)))
          (50-arg-cost
-           (run-time
+           (trivial-benchmark
             (apply #'50-arg-defmethod '#.(iota 50))))
          (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
-    (format t "~a plus ~a per argument for calling a DEFMETHOD.~%"
-            (time-string 0-arg-cost)
-            (time-string slope)))
+    (display "~a plus ~a per argument for calling a DEFMETHOD.~%"
+             (as-time 0-arg-cost)
+             (as-time slope)))
   (macrolet ((keyword-args (n)
                `',(loop for i below n
                         append
@@ -129,16 +140,16 @@
                           (format  nil "KEYWORD-~d" i))
                          i))))
     (let* ((1-keyword-defun-cost
-             (run-time
+             (trivial-benchmark
               (apply #'1-keyword-defun (keyword-args 1))))
            (20-keyword-defun-cost
-             (run-time
+             (trivial-benchmark
               (apply #'20-keyword-defun (keyword-args 20))))
            (slope (/ (- 20-keyword-defun-cost
                         1-keyword-defun-cost)
                      19)))
-      (format t "~a per keyword argument.~%"
-              (time-string slope)))))
+      (display "~a per keyword argument.~%"
+               (as-time slope)))))
 
 (defmacro n-arg-defun (name n)
   (let ((args (loop for i below n collect (gensym))))
@@ -182,12 +193,14 @@
   (let* ((struct (make-some-struct))
          (class (make-instance 'some-class))
          (struct-cost
-           (run-time (some-struct-slot-1 struct)))
+           (trivial-benchmark
+            (some-struct-slot-1 struct)))
          (class-cost
-           (run-time (slot-1 class))))
-    (format t "~a for a struct, ~a for a class."
-            (time-string struct-cost)
-            (time-string class-cost))))
+           (trivial-benchmark
+            (slot-1 class))))
+    (display "~a for a struct, ~a for a class."
+             (as-time struct-cost)
+             (as-time class-cost))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -199,120 +212,106 @@
                                     :initial-element #\_))
          (list (make-list length))
          (vector (make-array length :initial-element nil)))
-    (format t "~a per character of a string.~%"
-            (time-string (/ (find-run-time string) length)))
-    (format t "~a per item in a list.~%"
-            (time-string (/ (find-run-time list) length)))
-    (format t "~a per element of of a vector.~%"
-            (time-string (/ (find-run-time vector) length)))))
+    (display "~a per character of a string.~%"
+             (as-time (/ (find-benchmark string) length)))
+    (display "~a per item in a list.~%"
+             (as-time (/ (find-benchmark list) length)))
+    (display "~a per element of of a vector.~%"
+             (as-time (/ (find-benchmark vector) length)))))
 
-(defun find-run-time (sequence)
-  (run-time
-    (find #\! sequence)))
+(declaim (notinline find-benchmark))
+(defun find-benchmark (sequence)
+  (trivial-benchmark
+   (find #\! sequence)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; hash tables
 
 (answer |What is the cost of a hash table lookup?|
-  (let ((eq (hash-run-time #'eq (iota 40)))
-        (eql (hash-run-time #'eql (iota 40)))
-        (equal-0 (hash-run-time #'equal (iota 40)))
+  (let ((eq (hash-trivial-benchmark #'eq (iota 40)))
+        (eql (hash-trivial-benchmark #'eql (iota 40)))
+        (equal-0 (hash-trivial-benchmark #'equal (iota 40)))
         (equal-100
           (let ((keys (loop for i below 40
                             collect (make-list 100 :initial-element i))))
-            (hash-run-time #'equal keys)))
-        (equalp-0 (hash-run-time #'equalp (iota 40)))
+            (hash-trivial-benchmark #'equal keys)))
+        (equalp-0 (hash-trivial-benchmark #'equalp (iota 40)))
         (equalp-100
           (let ((keys (loop for i below 40
                             collect (make-list 100 :initial-element i))))
-            (hash-run-time #'equalp keys))))
-    (format t "~a for an EQ hash table.~%"
-            (time-string eq))
-    (format t "~a for an EQL hash table.~%"
-            (time-string eql))
-    (format t "~a plus ~a per cons for an EQUAL hash table.~%"
-            (time-string equal-0)
-            (time-string
-             (/ (- equal-100 equal-0) 100)))
-    (format t "~a plus ~a per cons for an EQUALP hash table.~%"
-            (time-string equalp-0)
-            (time-string
-             (/ (- equalp-100 equalp-0) 100)))))
+            (hash-trivial-benchmark #'equalp keys))))
+    (display "~a for an EQ hash table.~%"
+             (as-time eq))
+    (display "~a for an EQL hash table.~%"
+             (as-time eql))
+    (display "~a plus ~a per cons for an EQUAL hash table.~%"
+             (as-time equal-0)
+             (as-time
+              (/ (- equal-100 equal-0) 100)))
+    (display "~a plus ~a per cons for an EQUALP hash table.~%"
+             (as-time equalp-0)
+             (as-time
+              (/ (- equalp-100 equalp-0) 100)))))
 
-(defun hash-run-time (test keys)
+(defun hash-trivial-benchmark (test keys)
   (let ((hash-table (make-hash-table :test test))
         (keys (apply #'vector keys)))
     (loop for key across keys do
       (setf (gethash key hash-table) nil))
     (let ((keys (shuffle keys)))
-      (benchmark
-       (lambda (invocations)
-         (declare (type fixnum invocations)
-                  (type (simple-array t (*)) keys))
-         (dotimes (i (floor invocations (length keys)))
-           (dotimes (i (length keys))
-             (touch (gethash (svref keys i) hash-table)))))
-       (lambda (invocations)
-         (declare (type fixnum invocations)
-                  (type (simple-array t (*)) keys))
-         (dotimes (i (floor invocations (length keys)))
-           (dotimes (i (length keys))
-             (touch (svref keys i)))))))))
+      (benchmark (invocations)
+        (declare (type (simple-array t (*)) keys))
+        (dotimes (i (floor invocations (length keys)))
+          (dotimes (i (length keys))
+            (let ((key (svref keys i)))
+              (touch key)
+              (measure (gethash key hash-table)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; number crunching
 
-(answer |How many floating-point operations can this system do per second?|
-  (format t "~a in single precision and ~a in double precision.~%"
-          (flops-string (max (flops 'single-float)
-                             (flops '(complex single-float))))
-          (flops-string (max (flops 'double-float)
-                             (flops '(complex double-float))))))
+;; Thanks to Robert Strandh for this elegant idea
+(defmacro with-specialized-array-types (arrays element-types &body body)
+  (if (null element-types)
+      `(error "The arrays ~a have no matching element type." (list ,@arrays))
+      `(if (and ,@(loop for a in arrays collect
+                        `(typep ,a '(simple-array ,(car element-types) (*)))))
+           ,@body
+           (with-specialized-array-types ,arrays ,(cdr element-types)
+             ,@body))))
 
-(defmacro define-number-cruncher (name type coefficient)
-  `(defun ,name (length a b c)
-     (declare
-      (optimize (speed 3)
-                #-ccl(safety 0) #+ccl(safety 3)
-                (debug 0)
-                (compilation-speed 0)
-                (space 0))
-      (type (simple-array ,type (*)) a b c))
-     (loop for i fixnum below length do
-       (setf (aref c i) (* (+ (aref a i) (aref b i))
-                           ,coefficient)))))
-
-(define-number-cruncher crunch-c64 (complex double-float) 0.5d0)
-(define-number-cruncher crunch-c32 (complex single-float) 0.5)
-(define-number-cruncher crunch-f64 double-float 0.5d0)
-(define-number-cruncher crunch-f32 single-float 0.5)
+(declaim (notinline crunch))
+(defun crunch (length a b c)
+  (declare (optimize (speed 3)
+                     #-ccl(safety 0) #+ccl(safety 3)
+                     (debug 0)
+                     (compilation-speed 0)
+                     (space 0)))
+  (with-specialized-array-types (a b c) (single-float double-float)
+    (loop for i fixnum below length do
+      (setf (aref c i) (* (+ (aref a i) (aref b i)) 1/2)))))
 
 (defun flops (element-type)
-  (let* ((length 400)
-         (initial-element (coerce 0.0 element-type))
-         (a1 (make-array
-              length
-              :element-type element-type
-              :initial-element initial-element))
-         (a2 (make-array
-              length
-              :element-type element-type
-              :initial-element initial-element)))
-    (/
-     (benchmark
-      (lambda (invocations)
-        (let* ((flop/traversal
-                 (cond
-                   ((subtypep element-type 'complex) (* 4 length))
-                   (t (* 2 length))))
-               (traversals (/ invocations flop/traversal)))
-          (loop for iteration below traversals by 2 do
-            (let ((f (etypecase initial-element
-                       (single-float #'crunch-f32)
-                       (double-float #'crunch-f64)
-                       ((complex single-float) #'crunch-c32)
-                       ((complex double-float) #'crunch-c64))))
-              (funcall f length a1 a1 a2)
-              (funcall f length a2 a2 a1)))))))))
+  (let ((length 400)
+        (initial-element (coerce 0 element-type)))
+    (let ((a1 (make-array
+               length
+               :element-type element-type
+               :initial-element initial-element))
+          (a2 (make-array
+               length
+               :element-type element-type
+               :initial-element initial-element)))
+      (let ((flop/run (* 2 2 length))
+            (time/run (trivial-benchmark
+                       (progn
+                         (crunch length a1 a1 a2)
+                         (crunch length a2 a2 a1)))))
+        (/ flop/run time/run)))))
+
+(answer |How many floating-point operations can this system do per second?|
+  (display "~a in single precision and ~a in double precision.~%"
+           (as-flops (flops 'single-float))
+           (as-flops (flops 'double-float))))

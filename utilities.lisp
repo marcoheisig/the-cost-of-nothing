@@ -2,61 +2,93 @@
 
 (in-package :the-cost-of-nothing)
 
-(defun benchmark (f-plus-overhead &optional (overhead #'identity))
-  "The function F-PLUS-OVERHEAD must invoke a certain operation N times for
-any given integer N. The function OVERHEAD should execute the same code,
-but without this operation. BENCHMARK returns a double-float describing the
-average duration of one such operation in seconds."
-  (gc) ; expensive, but crucial for reasonable results
-  (let* ((overhead (%benchmark overhead))
-         (time (%benchmark f-plus-overhead)))
-    (max (- time overhead) 0.0d0)))
+(declaim (notinline touch))
+(defun touch (object)
+  "Protects OBJECT from compiler optimization."
+  (declare (ignore object))
+  (values))
 
-(defparameter *minimum-sampling-time*
-  (* 40 (/ internal-time-units-per-second)))
+(defmacro measure (form)
+  (declare (ignore form))
+  (error "MEASURE is only valid inside a BENCHMARK form."))
 
-(defun %benchmark (f)
-  (let ((invocations 1)
-        (time 0.0d0))
-    (loop
-      (setf time (funcall-time f invocations))
+(defmacro benchmark ((iteration-variable) &body body)
+  `(measure-execution-time
+    (lambda (,iteration-variable)
+      (declare (type integer ,iteration-variable))
+      (macrolet ((measure (form)
+                   `(touch ,form)))
+        ,@body))
+    (lambda (,iteration-variable)
+      (declare (type integer ,iteration-variable))
+      (macrolet ((measure (form)
+                   (declare (ignore form))
+                   `(touch nil)))
+        ,@body))))
 
-      ;; stopping criterium #1: enough sampling time
-      (when (> time *minimum-sampling-time*)
-        (return (/ time invocations)))
+(defmacro trivial-benchmark (form)
+  (with-gensyms (iterations)
+    `(benchmark (,iterations)
+       (loop repeat ,iterations do
+         (measure ,form)))))
 
-      ;; increase the number of invocations
-      (setf invocations
-            (if (zerop time)
-                (* invocations 2)
-                (* invocations
-                   (ceiling (* 1.1 *minimum-sampling-time*)
-                            time))))
-
-      ;; stopping criterium #2: insanely many invocations
-      (when (> invocations most-positive-fixnum)
-        (return 0.0d0)))))
-
-(defun funcall-time (function &rest arguments)
-  "Naively measure the time it takes to invoke FUNCTION with the given
-ARGUMENTS. Returns the run time in seconds as a double-float."
-  (let ((time (get-internal-real-time)))
-    (apply function arguments)
-    (coerce (/ (- (get-internal-real-time) time)
-               internal-time-units-per-second)
+(defun measure-execution-time-of-thunk (thunk)
+  (let* ((t0 (get-internal-run-time))
+         (_  (funcall thunk))
+         (t1 (get-internal-run-time)))
+    (declare (ignore _))
+    (coerce (/ (- t1 t0) internal-time-units-per-second)
             'double-float)))
 
-(defmacro run-time (form)
-  (with-gensyms (invocations i)
-    `(benchmark
-      (lambda (,invocations)
-        (dotimes (,i ,invocations)
-          (touch ,form)))
-      (lambda (,invocations)
-        (dotimes (,i ,invocations)
-          (touch nil))))))
+(defun measure-execution-time (fun &optional (overhead #'identity))
+  "The function FUN must invoke a certain operation n times for any given
+integer n. The function OVERHEAD should execute the same code, but without
+this operation.
 
-(defun time-string (time)
+Returns three values:
+duration    - a double-float denoting the duration of one operation in seconds
+confidence  - a single-flot between 0.0 (garbage) and 1.0 (absolute confidence)
+invocations - the number of invocations used to determine the result"
+  (let ((min-effective-samples 100)
+        (max-benchtime         1.6)
+        (min-sampletime        0.1)
+        (invocation-growth     1.8))
+    (gc) ; expensive, but crucial for reasonable results
+    (loop
+      :for invocations :of-type unsigned-byte := 3
+        :then (floor (* invocations invocation-growth))
+      :for benchtime :of-type double-float := 0d0
+        :then (measure-execution-time-of-thunk
+               (lambda ()
+                 (funcall fun invocations)))
+      :for sampletime :of-type double-float := 0d0
+        :then (- benchtime
+                 (measure-execution-time-of-thunk
+                  (lambda ()
+                    (funcall overhead invocations))))
+      :for confidence :of-type single-float := 0.0
+        :then (if (not (and (plusp benchtime)
+                            (plusp sampletime)))
+                  0.0
+                  (let ((sample-confidence
+                          (/ (* invocations (/ sampletime benchtime))
+                             min-effective-samples))
+                        (time-confidence
+                          (/ sampletime min-sampletime)))
+                    (coerce
+                     (* (min 1.0 sample-confidence)
+                        (min 1.0 time-confidence))
+                     'single-float)))
+      :until (or (> benchtime max-benchtime)
+                 (= confidence 1d0))
+      :finally
+         (return
+           (values
+            (/ (max sampletime 0d0) invocations)
+            confidence
+            invocations)))))
+
+(defun as-time (time)
   (cond
     ((< time 1.d-6)
      (format nil "~,2F nanoseconds" (* time 1.d9)))
@@ -67,7 +99,7 @@ ARGUMENTS. Returns the run time in seconds as a double-float."
     (t
      (format nil "~,2F seconds" time))))
 
-(defun flops-string (flops)
+(defun as-flops (flops)
   (cond
     ((> flops 1.d11)
      (format nil "~,2F terraFLOPS" (/ flops 1.d12)))
@@ -80,8 +112,3 @@ ARGUMENTS. Returns the run time in seconds as a double-float."
     (t
      (format nil "~,2F FLOPS" flops))))
 
-(declaim (notinline touch))
-(defun touch (object)
-  "Essentially equivalent to IDENTITY, but protects OBJECT from compiler
-  optimizations."
-  object)

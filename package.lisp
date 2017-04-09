@@ -3,5 +3,5 @@
 (in-package :cl-user)
 
 (defpackage :the-cost-of-nothing
-  (:use :cl :alexandria :trivial-garbage)
+  (:use :closer-common-lisp :alexandria :trivial-garbage)
   (:export #:enlighten-me!))
