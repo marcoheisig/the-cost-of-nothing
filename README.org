@@ -6,12 +6,14 @@ A LISP programmer knows the value of everything, but the cost of nothing.
 
 These are some portable benchmarks to estimate the cost of individual
 Common Lisp operations on the given platform and implementation. I hope you
-find it useful.
+find it useful. To run all benchmarks, simply run
 
-To run all benchmarks, simply run
 #+BEGIN_SRC lisp :results output
 (asdf:test-system :the-cost-of-nothing)
 #+END_SRC
+
+The benchmark-related symbols are exported and may be useful for other
+projects, too.
 
 And please do not forget
 
