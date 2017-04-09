@@ -4,4 +4,9 @@
 
 (defpackage :the-cost-of-nothing
   (:use :closer-common-lisp :alexandria :trivial-garbage)
-  (:export #:enlighten-me!))
+  (:export
+   #:enlighten-me!
+   #:benchmark
+   #:nested-benchmark
+   #:measure-execution-time-of-thunk
+   #:measure-execution-time))

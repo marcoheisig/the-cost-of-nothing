@@ -8,31 +8,27 @@
   (declare (ignore object))
   (values))
 
-(defmacro measure (form)
-  (declare (ignore form))
-  (error "MEASURE is only valid inside a BENCHMARK form."))
+(defmacro benchmark (form)
+  `(nested-benchmark (benchmark ,form)))
 
-(defmacro benchmark ((iteration-variable) &body body)
-  `(measure-execution-time
-    (lambda (,iteration-variable)
-      (declare (type integer ,iteration-variable))
-      (macrolet ((measure (form)
-                   `(touch ,form)))
-        ,@body))
-    (lambda (,iteration-variable)
-      (declare (type integer ,iteration-variable))
-      (macrolet ((measure (form)
-                   (declare (ignore form))
-                   `(touch nil)))
-        ,@body))))
-
-(defmacro trivial-benchmark (form)
+(defmacro nested-benchmark (&body body)
   (with-gensyms (iterations)
-    `(benchmark (,iterations)
-       (loop repeat ,iterations do
-         (measure ,form)))))
+    `(measure-execution-time
+      (lambda (,iterations)
+        (loop :repeat ,iterations :do
+          (macrolet ((benchmark (form) `(touch ,form)))
+            ,@body)))
+      :overhead
+      (lambda (,iterations)
+        (loop :repeat ,iterations :do
+          (macrolet ((benchmark (form)
+                        (declare (ignore form))
+                        `(touch nil)))
+            ,@body))))))
 
 (defun measure-execution-time-of-thunk (thunk)
+  "Execute THUNK and return the execution time of THUNK in seconds as a
+double-float."
   (let* ((t0 (get-internal-run-time))
          (_  (funcall thunk))
          (t1 (get-internal-run-time)))
@@ -40,38 +36,38 @@
     (coerce (/ (- t1 t0) internal-time-units-per-second)
             'double-float)))
 
-(defun measure-execution-time (fun &optional (overhead #'identity))
-  "The function FUN must invoke a certain operation n times for any given
-integer n. The function OVERHEAD should execute the same code, but without
-this operation.
+(defun measure-execution-time (fun &key (overhead #'identity) (timeout 2.0))
+  "The function FUN must invoke a certain operation N times for any given
+integer N. The function OVERHEAD should execute the same code, but without
+this operation. An attempt is made to benchmark no longer than TIMEOUT
+seconds.
 
 Returns three values:
-duration    - a double-float denoting the duration of one operation in seconds
+duration    - a double-float denoting the duration of the operation in seconds
 confidence  - a single-flot between 0.0 (garbage) and 1.0 (absolute confidence)
-invocations - the number of invocations used to determine the result"
+iterations  - the number N of iterations used to determine the result"
   (let ((min-effective-samples 100)
-        (max-benchtime         1.6)
         (min-sampletime        0.1)
         (invocation-growth     1.8))
     (gc) ; expensive, but crucial for reasonable results
     (loop
-      :for invocations :of-type unsigned-byte := 3
-        :then (floor (* invocations invocation-growth))
+      :for iterations :of-type unsigned-byte := 3
+        :then (floor (* iterations invocation-growth))
       :for benchtime :of-type double-float := 0d0
         :then (measure-execution-time-of-thunk
                (lambda ()
-                 (funcall fun invocations)))
+                 (funcall fun iterations)))
       :for sampletime :of-type double-float := 0d0
         :then (- benchtime
                  (measure-execution-time-of-thunk
                   (lambda ()
-                    (funcall overhead invocations))))
+                    (funcall overhead iterations))))
       :for confidence :of-type single-float := 0.0
         :then (if (not (and (plusp benchtime)
                             (plusp sampletime)))
                   0.0
                   (let ((sample-confidence
-                          (/ (* invocations (/ sampletime benchtime))
+                          (/ (* iterations (/ sampletime benchtime))
                              min-effective-samples))
                         (time-confidence
                           (/ sampletime min-sampletime)))
@@ -79,14 +75,14 @@ invocations - the number of invocations used to determine the result"
                      (* (min 1.0 sample-confidence)
                         (min 1.0 time-confidence))
                      'single-float)))
-      :until (or (> benchtime max-benchtime)
+      :until (or (> benchtime timeout)
                  (= confidence 1d0))
       :finally
          (return
            (values
-            (/ (max sampletime 0d0) invocations)
+            (/ (max sampletime 0d0) iterations)
             confidence
-            invocations)))))
+            iterations)))))
 
 (defun as-time (time)
   (cond
