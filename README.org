@@ -4,18 +4,38 @@ A LISP programmer knows the value of everything, but the cost of nothing.
 --- Alan Perlis
 #+END_QUOTE
 
-These are some portable benchmarks to estimate the cost of individual
-Common Lisp operations on the given platform and implementation. I hope you
-find it useful. To run all benchmarks, simply run
+These are some portable benchmarks and tests to estimate the cost of
+individual Common Lisp operations on the given platform and implementation.
+I hope you find it useful.
+
+* Usage
+To run all benchmarks, simply execute
 
 #+BEGIN_SRC lisp :results output
 (asdf:test-system :the-cost-of-nothing)
 #+END_SRC
 
-The benchmark-related symbols are exported and may be useful for other
-projects, too.
+To obtain the execution time of an expression in seconds, type
+#+BEGIN_SRC lisp
+(benchmark EXPRESSION)
+#+END_SRC
 
-And please do not forget
+To measure only certain parts of an expression, type
+#+BEGIN_SRC lisp
+(nested-benchmark
+  (foo)
+  (bar)
+  (SUBEXPRESSION1)
+  (let ((a (baz)))
+    (benchmark SUBEXPRESSION2)))
+#+END_SRC
+
+Furthermore the library exports the following functions
+- MEASURE-EXECUTION-TIME
+- MEASURE-EXECUTION-TIME-OF-THUNK
+
+* Final Remark
+Please do not forget
 
 #+BEGIN_QUOTE
 There are lies, damned lies, and benchmarks.
