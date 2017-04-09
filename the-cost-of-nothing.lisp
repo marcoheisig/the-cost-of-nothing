@@ -261,9 +261,10 @@
     (declare (type (simple-array t (*)) keys))
     (loop for key across keys do
       (setf (gethash key table) nil))
-    (nested-benchmark
-     (loop for key across keys do
-       (benchmark (gethash key table))))))
+    (/ (nested-benchmark
+         (loop for key across keys do
+           (benchmark (gethash key table))))
+       (length keys))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
