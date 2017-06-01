@@ -4,11 +4,20 @@ A LISP programmer knows the value of everything, but the cost of nothing.
 --- Alan Perlis
 #+END_QUOTE
 
-These are some portable benchmarks and tests to estimate the cost of
-individual Common Lisp operations on the given platform and implementation.
-I hope you find it useful.
+This library attempts to measure the execution time of Lisp code using only
+portable mechanisms, i.e. get-internal-run-time. Using some macrology and
+sampling, the measurements can be accurate to the nanosecond.
 
-* Usage
+Apart from the benchmark utilities, the library features a test suite that
+reports the runtime of various Common Lisp features like CLOS, function
+calls, hashtables, garbage collection and many others. This may give
+valuable performance insights, e.g. for which size hashtables outperform
+linked lists on a given implementation.
+
+I hope you find it useful. If you have new ideas for benchmarks, or
+suggestions on how to improve existing ones, feel free to contact me.
+
+** Usage
 To run all benchmarks, simply execute
 
 #+BEGIN_SRC lisp :results output
@@ -34,9 +43,34 @@ Furthermore the library exports the following functions
 - MEASURE-EXECUTION-TIME
 - MEASURE-EXECUTION-TIME-OF-THUNK
 
-* Final Remark
-Please do not forget
+** Implementation
+A statement like
+#+BEGIN_SRC lisp
+(nested-benchmark
+ (loop for key across keys do
+   (benchmark (gethash key table))))
+#+END_SRC
 
+is a macro that expands into something like
+#+BEGIN_SRC lisp
+(measure-execution-time
+ (lambda (#:iterations723)
+   (loop :repeat #:iterations723
+         :do (loop for key across keys
+                   do (touch (gethash key table)))))
+ :overhead
+ (lambda (#:iterations723)
+   (loop :repeat #:iterations723
+         :do (loop for key across keys
+                   do (touch nil)))))
+#+END_SRC
+
+The function TOUCH is explicitly declared notinline, to prevent compiler
+optimization. The function MEASURE-EXECUTION-TIME invokes its argument
+functions with higher and higher numbers of iterations, until the
+difference between them is significant.
+
+** Remember
 #+BEGIN_QUOTE
 There are lies, damned lies, and benchmarks.
 #+END_QUOTE

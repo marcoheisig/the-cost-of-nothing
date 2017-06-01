@@ -9,9 +9,27 @@
   (values))
 
 (defmacro benchmark (form)
+  "Execute FORM multiple times to accurately measure its execution time in
+seconds. The returned values are literally the same as those from an
+invocation of MEASURE-EXECUTION-TIME with suitable lambdas.
+
+Examples:
+(benchmark (cons nil nil)) -> 3.3d-9 1.0 36995264
+(benchmark (gc :full t))   -> 0.031 0.9 90"
   `(nested-benchmark (benchmark ,form)))
 
 (defmacro nested-benchmark (&body body)
+  "Execute BODY multiple times to accurately measure the execution time in
+seconds of all statements that appear inside of a BENCHMARK statement. The
+returned values are literally the same as those from an invocation of
+MEASURE-EXECUTION-TIME with suitable lambdas.
+
+Examples:
+(/ (nested-benchmark
+     (loop for key across keys do
+       (benchmark (gethash key table))))
+   (length keys))
+-> 1.5527d-8"
   (with-gensyms (iterations)
     `(measure-execution-time
       (lambda (,iterations)
@@ -48,7 +66,7 @@ confidence  - a single-flot between 0.0 (garbage) and 1.0 (absolute confidence)
 iterations  - the number N of iterations used to determine the result"
   (let ((min-effective-samples 100)
         (min-sampletime        0.1)
-        (invocation-growth     1.8))
+        (invocation-growth     1.77))
     (gc) ; expensive, but crucial for reasonable results
     (loop
       :for iterations :of-type unsigned-byte := 3
@@ -108,3 +126,10 @@ iterations  - the number N of iterations used to determine the result"
     (t
      (format nil "~,2F FLOPS" flops))))
 
+(defun mkstr (&rest args)
+  (with-output-to-string (string)
+    (dolist (arg args)
+      (princ arg string))))
+
+(defun symb (&rest args)
+  (values (intern (apply #'mkstr args))))

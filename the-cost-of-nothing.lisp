@@ -24,7 +24,62 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; core functionality
+;;; macros to generate benchmarkable entities
+
+(defmacro n-slot-struct (name n)
+  `(defstruct ,name
+     ,@(loop for i below n
+             collect
+             `(,(symb "SLOT" i) 0 :type fixnum))))
+
+(defmacro n-slot-class (name n)
+  `(defclass ,name ()
+     ,(loop for i below n
+            collect
+            `(,(symb "SLOT" i) :type fixnum :initform 0))))
+
+(defmacro n-arg-defun (name n)
+  (let ((args (loop for i below n collect (symb "A" i))))
+    `(progn
+       (declaim (notinline ,name))
+       (defun ,name (,@args)
+         (declare (ignore ,@args))))))
+
+(defmacro n-arg-defmethod (name n)
+  (let ((args (loop for i below n collect (symb "A" i))))
+    `(defgeneric ,name (,@args)
+       (:method (,@args) (declare (ignore ,@args))))))
+
+(defmacro n-keyword-defun (name n)
+  (let ((args (loop for i below n collect (symb "K" i))))
+    `(defun ,name (&key ,@args)
+       ;; actually use the arguments to trigger keyword parsing
+       (or ,@args))))
+
+(n-slot-struct  0-slot-struct  0)
+(n-slot-struct 50-slot-struct 50)
+
+(n-slot-class  0-slot-class  0)
+(n-slot-class 50-slot-class 50)
+
+(n-arg-defun  0-arg-defun  0)
+(n-arg-defun 50-arg-defun 50)
+
+(n-keyword-defun  1-keyword-defun  1)
+(n-keyword-defun 20-keyword-defun 20)
+
+(n-arg-defmethod  0-arg-defmethod  0)
+(n-arg-defmethod 50-arg-defmethod 50)
+
+(defclass some-class ()
+  ((slot-1 :accessor slot-1 :initform 42)))
+
+(defstruct some-struct
+  (slot-1 42))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; core functionality benchmarks
 
 (answer |What Lisp system is this?|
   (display "~:[Something weird~;~:*~a~]"
@@ -45,9 +100,7 @@
   ;; MAKE-ARRAY
   (flet ((array-cost (bytes)
            (benchmark
-            (make-array
-             bytes
-             :element-type '(unsigned-byte 8)))))
+            (make-array bytes :element-type '(unsigned-byte 8)))))
     (let* ((x0 4)
            (x1 100000)
            (y0 (array-cost x0))
@@ -64,36 +117,15 @@
              (as-time y0)
              (as-time slope)))
   ;; MAKE-INSTANCE
+  ;; CLOS warmup
+  (loop repeat 100 do (touch (make-instance  '0-slot-class)))
+  (loop repeat 100 do (touch (make-instance '50-slot-class)))
   (let* (( y0 (benchmark (make-instance '0-slot-class)))
          (y50 (benchmark (make-instance '50-slot-class)))
          (slope (/ (- y50 y0) 50)))
     (display "~a, plus ~a per slot for instantiating classes.~%"
              (as-time y0)
              (as-time slope))))
-
-(defmacro n-slot-struct (name n)
-  (let ((slots
-          (loop for i below n
-                collect
-                `(,(intern (format nil "SLOT-~d" i))
-                  0 :type fixnum))))
-    `(defstruct ,name ,@slots)))
-
-(n-slot-struct 0-slot-struct 0)
-
-(n-slot-struct 50-slot-struct 50)
-
-(defmacro n-slot-class (name n)
-  (let ((slots
-          (loop for i below n
-                collect
-                `(,(intern (format nil "SLOT-~d" i))
-                  :type fixnum :initform 0))))
-    `(defclass ,name () ,slots)))
-
-(n-slot-class 0-slot-class  0)
-
-(n-slot-class 50-slot-class 50)
 
 (answer |What is the cost of garbage collection?|
   (display "~a for a normal GC, ~a for a full GC.~%"
@@ -112,12 +144,11 @@
             (0-arg-defun)))
          (50-arg-cost
            (benchmark
-            (apply #'50-arg-defun '#.(iota 50))))
+            #.`(50-arg-defun ,@(iota 50))))
          (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
     (display "~a plus ~a per argument for calling a DEFUN.~%"
              (as-time 0-arg-cost)
              (as-time slope)))
-
   ;; call each defmethod several times before benchmarking it to give CLOS
   ;; time to set up its stuff
   (loop repeat 100 do (touch (0-arg-defmethod)))
@@ -135,10 +166,7 @@
   (macrolet ((keyword-args (n)
                `',(loop for i below n
                         append
-                        (list
-                         (make-keyword
-                          (format  nil "KEYWORD-~d" i))
-                         i))))
+                        (list (make-keyword (format nil "K~d" i)) i))))
     (let* ((1-keyword-defun-cost
              (benchmark
               (apply #'1-keyword-defun (keyword-args 1))))
@@ -150,44 +178,6 @@
                      19)))
       (display "~a per keyword argument.~%"
                (as-time slope)))))
-
-(defmacro n-arg-defun (name n)
-  (let ((args (loop for i below n collect (gensym))))
-    `(progn
-       (declaim (notinline ,name))
-       (defun ,name (,@args)
-         (declare (ignore ,@args))))))
-
-(defmacro n-arg-defmethod (name n)
-  (let ((args (loop for i below n collect (gensym))))
-    `(defgeneric ,name (,@args)
-       (:method (,@args) (declare (ignore ,@args))))))
-
-(defmacro n-keyword-defun (name n)
-  (let ((args (loop for i below n
-                    collect
-                    (make-symbol
-                     (format nil "KEYWORD-~d" i)))))
-    `(defun ,name (&key ,@args)
-       (or ,@args))))
-
-(n-arg-defun 0-arg-defun 0)
-
-(n-arg-defun 50-arg-defun 50)
-
-(n-arg-defmethod 0-arg-defmethod 0)
-
-(n-arg-defmethod 50-arg-defmethod 50)
-
-(n-keyword-defun 1-keyword-defun 1)
-
-(n-keyword-defun 20-keyword-defun 20)
-
-(defclass some-class ()
-  ((slot-1 :accessor slot-1 :initform 42)))
-
-(defstruct some-struct
-  (slot-1 42))
 
 (answer |What is the cost of accessing a SLOT?|
   (let* ((struct (make-some-struct))
@@ -204,7 +194,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; lists and sequences
+;;; list and sequence function benchmarks
+
+(declaim (notinline benchmark-find))
+(defun benchmark-find (sequence)
+  (benchmark
+   (find #\! sequence)))
 
 (answer |What is the cost of FINDing things?|
   (let* ((length 100)
@@ -213,20 +208,27 @@
          (list (make-list length))
          (vector (make-array length :initial-element nil)))
     (display "~a per character of a string.~%"
-             (as-time (/ (find-benchmark string) length)))
+             (as-time (/ (benchmark-find string) length)))
     (display "~a per item in a list.~%"
-             (as-time (/ (find-benchmark list) length)))
+             (as-time (/ (benchmark-find list) length)))
     (display "~a per element of of a vector.~%"
-             (as-time (/ (find-benchmark vector) length)))))
-
-(declaim (notinline find-benchmark))
-(defun find-benchmark (sequence)
-  (benchmark
-   (find #\! sequence)))
+             (as-time (/ (benchmark-find vector) length)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; hash tables
+;;; hash table benchmarks
+
+(declaim (notinline benchmark-hash-table))
+(defun benchmark-hash-table (test keys)
+  (let ((table (make-hash-table :test test))
+        (keys (shuffle (apply #'vector keys))))
+    (declare (type (simple-array t (*)) keys))
+    (loop for key across keys do
+      (setf (gethash key table) nil))
+    (/ (nested-benchmark
+         (loop for key across keys do
+           (benchmark (gethash key table))))
+       (length keys))))
 
 (answer |What is the cost of a hash table lookup?|
   (let ((eq (benchmark-hash-table #'eq (iota 40)))
@@ -254,21 +256,9 @@
              (as-time
               (/ (- equalp-100 equalp-0) 100)))))
 
-(declaim (notinline benchmark-hash-table))
-(defun benchmark-hash-table (test keys)
-  (let ((table (make-hash-table :test test))
-        (keys (shuffle (apply #'vector keys))))
-    (declare (type (simple-array t (*)) keys))
-    (loop for key across keys do
-      (setf (gethash key table) nil))
-    (/ (nested-benchmark
-         (loop for key across keys do
-           (benchmark (gethash key table))))
-       (length keys))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; number crunching
+;;; number crunching benchmarks
 
 ;; My sincere thanks to Robert Strandh for this elegant idea
 (defmacro with-specialized-array-types (arrays element-types &body body)
