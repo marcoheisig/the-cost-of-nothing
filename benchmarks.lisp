@@ -26,35 +26,49 @@
 ;;;
 ;;; macros to generate benchmarkable entities
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun nth-slot        (n) (intern (format nil "SLOT~D" n)))
+  (defun nth-arg         (n) (intern (format nil "ARG~D" n)))
+  (defun nth-keyword-arg (n) (intern (format nil "KEYWORD~D" n)))
+  (defun nth-keyword     (n) (make-keyword (format nil "KEYWORD~D" n))))
+
 (defmacro n-slot-struct (name n)
   `(defstruct ,name
      ,@(loop for i below n
              collect
-             `(,(symb "SLOT" i) 0 :type fixnum))))
+             `(,(nth-slot i) 0 :type fixnum))))
 
 (defmacro n-slot-class (name n)
   `(defclass ,name ()
      ,(loop for i below n
             collect
-            `(,(symb "SLOT" i) :type fixnum :initform 0))))
+            `(,(nth-slot i) :type fixnum :initform 0))))
 
 (defmacro n-arg-defun (name n)
-  (let ((args (loop for i below n collect (symb "A" i))))
+  (let ((args (loop for i below n collect (nth-arg i))))
     `(progn
        (declaim (notinline ,name))
        (defun ,name (,@args)
          (declare (ignore ,@args))))))
 
 (defmacro n-arg-defmethod (name n)
-  (let ((args (loop for i below n collect (symb "A" i))))
+  (let ((args (loop for i below n collect (nth-arg i))))
     `(defgeneric ,name (,@args)
        (:method (,@args) (declare (ignore ,@args))))))
 
 (defmacro n-keyword-defun (name n)
-  (let ((args (loop for i below n collect (symb "K" i))))
+  (let ((args (loop for i below n collect (nth-keyword-arg i))))
     `(defun ,name (&key ,@args)
        ;; actually use the arguments to trigger keyword parsing
        (or ,@args))))
+
+(defmacro n-arg-call (n function)
+  `(,function ,@(loop for i below n collect i)))
+
+(defmacro n-keyword-call (n function)
+  `(,function
+    ,@(loop for i below n
+            append `(,(nth-keyword i) ,i))))
 
 (n-slot-struct  0-slot-struct  0)
 (n-slot-struct 50-slot-struct 50)
@@ -139,45 +153,27 @@
              (benchmark (gc :full t))))))
 
 (answer |What is the cost of a function call?|
-  (let* ((0-arg-cost
-           (benchmark
-            (0-arg-defun)))
-         (50-arg-cost
-           (benchmark
-            #.`(50-arg-defun ,@(iota 50))))
+  (let* (( 0-arg-cost (benchmark (n-arg-call  0 0-arg-defun)))
+         (50-arg-cost (benchmark (n-arg-call 50 50-arg-defun)))
          (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
     (display "~a plus ~a per argument for calling a DEFUN.~%"
              (as-time 0-arg-cost)
              (as-time slope)))
   ;; call each defmethod several times before benchmarking it to give CLOS
   ;; time to set up its stuff
-  (loop repeat 100 do (touch (0-arg-defmethod)))
-  (loop repeat 100 do (touch (apply #'50-arg-defmethod '#.(iota 50))))
-  (let* ((0-arg-cost
-           (benchmark
-            (0-arg-defmethod)))
-         (50-arg-cost
-           (benchmark
-            (apply #'50-arg-defmethod '#.(iota 50))))
+  (loop repeat 100 do (touch (n-arg-call  0  0-arg-defmethod)))
+  (loop repeat 100 do (touch (n-arg-call 50 50-arg-defmethod)))
+  (let* (( 0-arg-cost (benchmark (n-arg-call  0 0-arg-defmethod)))
+         (50-arg-cost (benchmark (n-arg-call 50 50-arg-defmethod)))
          (slope (/ (- 50-arg-cost 0-arg-cost) 50)))
     (display "~a plus ~a per argument for calling a DEFMETHOD.~%"
              (as-time 0-arg-cost)
              (as-time slope)))
-  (macrolet ((keyword-args (n)
-               `',(loop for i below n
-                        append
-                        (list (make-keyword (format nil "K~d" i)) i))))
-    (let* ((1-keyword-defun-cost
-             (benchmark
-              (apply #'1-keyword-defun (keyword-args 1))))
-           (20-keyword-defun-cost
-             (benchmark
-              (apply #'20-keyword-defun (keyword-args 20))))
-           (slope (/ (- 20-keyword-defun-cost
-                        1-keyword-defun-cost)
-                     19)))
-      (display "~a per keyword argument.~%"
-               (as-time slope)))))
+  (let* (( 1-keyword-defun-cost (benchmark (n-keyword-call 1 1-keyword-defun)))
+         (20-keyword-defun-cost (benchmark (n-keyword-call 20 20-keyword-defun)))
+         (slope (/ (- 20-keyword-defun-cost 1-keyword-defun-cost) 19)))
+    (display "~a per keyword argument.~%"
+             (as-time slope))))
 
 (answer |What is the cost of accessing a SLOT?|
   (let* ((struct (make-some-struct))
