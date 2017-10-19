@@ -80,50 +80,61 @@
     (coerce (/ (- t1 t0) internal-time-units-per-second)
             'double-float)))
 
-(defun measure-execution-time (fun &key (overhead #'identity) (timeout 2.0))
+(defun measure-execution-time
+    (fun &key
+           (overhead #'identity)
+           (timeout 2.0)
+           (min-effective-samples 100)
+           (min-sample-time 0.1)
+           (invocation-growth 1.77))
   "The function FUN must invoke a certain operation N times for any given
    integer N. The function OVERHEAD should execute the same code, but without
-   this operation. An attempt is made to benchmark no longer than TIMEOUT
-   seconds.
+   this operation.
 
    Returns three values:
    duration    - a double-float denoting the duration of the operation in seconds
    confidence  - a single-flot between 0.0 (garbage) and 1.0 (absolute confidence)
    iterations  - the number N of iterations used to determine the result"
-  (let ((min-effective-samples 100)
-        (min-sampletime        0.1)
-        (invocation-growth     1.77))
-    (gc) ; expensive, but crucial for reasonable results
-    (loop
-      :for iterations :of-type unsigned-byte := 3
-        :then (floor (* iterations invocation-growth))
-      :for benchtime :of-type double-float := 0d0
-        :then (measure-execution-time-of-thunk
-               (lambda ()
-                 (funcall fun iterations)))
-      :for sampletime :of-type double-float := 0d0
-        :then (- benchtime
-                 (measure-execution-time-of-thunk
-                  (lambda ()
-                    (funcall overhead iterations))))
-      :for confidence :of-type single-float := 0.0
-        :then (if (not (and (plusp benchtime)
-                            (plusp sampletime)))
-                  0.0
-                  (let ((sample-confidence
-                          (/ (* iterations (/ sampletime benchtime))
-                             min-effective-samples))
-                        (time-confidence
-                          (/ sampletime min-sampletime)))
-                    (coerce
-                     (* (min 1.0 sample-confidence)
-                        (min 1.0 time-confidence))
-                     'single-float)))
-      :until (or (> benchtime timeout)
-                 (= confidence 1d0))
-      :finally
-         (return
-           (values
-            (/ (max sampletime 0d0) iterations)
-            confidence
-            iterations)))))
+  (declare (function fun overhead)
+           (type (single-float (0.0)) timeout min-sample-time)
+           (type (single-float (1.0)) invocation-growth)
+           (type (integer 1) min-effective-samples))
+  (gc) ; expensive, but crucial for reasonable results
+  (loop
+    ;; in each attempt, increase the number of iterations
+    :for iterations :of-type unsigned-byte := 3
+      :then (floor (* iterations invocation-growth))
+    ;; measure the cost of ITERATIONS runs of FUN
+    :for benchtime :of-type double-float
+      := (measure-execution-time-of-thunk
+          (lambda ()
+            (funcall fun iterations)))
+    ;; only the difference between the run time of FUN and the run time of
+    ;; OVERHEAD counts as SAMPLE-TIME
+    :for sample-time :of-type double-float
+      := (- benchtime
+            (measure-execution-time-of-thunk
+             (lambda ()
+               (funcall overhead iterations))))
+    ;; the measurement process involves both the MIN-SAMPLE-TIME constraint
+    ;; and the MIN-EFFECTIVE-SAMPLES constraint
+    :for confidence :of-type single-float
+      := (if (not (and (plusp benchtime) (plusp sample-time)))
+             0.0
+             (let ((sample-confidence
+                     (/ (* iterations (/ sample-time benchtime))
+                        min-effective-samples))
+                   (time-confidence
+                     (/ sample-time min-sample-time)))
+               (coerce
+                (* (min 1.0 sample-confidence)
+                   (min 1.0 time-confidence))
+                'single-float)))
+    ;; check the two stopping criteria
+    :until (or (> benchtime timeout) (= confidence 1.0))
+    :finally
+       (return
+         (values
+          (/ (max sample-time 0d0) iterations)
+          confidence
+          iterations))))
