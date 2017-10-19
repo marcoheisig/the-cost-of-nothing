@@ -15,4 +15,6 @@ collection, sequence traversal, CLOS and floating-point performance."
   ((:file "package")
    (:file "utilities"           :depends-on ("package"))
    (:file "the-cost-of-nothing" :depends-on ("utilities"))
-   (:static-file "COPYING")))
+   (:file "benchmarks"          :depends-on ("the-cost-of-nothing"))
+   (:static-file "COPYING")
+   (:static-file "README.org")))
