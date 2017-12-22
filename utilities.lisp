@@ -26,10 +26,8 @@
     (t
      (format nil "~,2F FLOPS" flops))))
 
-(defun mkstr (&rest args)
-  (with-output-to-string (string)
-    (dolist (arg args)
-      (princ arg string))))
-
-(defun symb (&rest args)
-  (values (intern (apply #'mkstr args))))
+(declaim (notinline touch))
+(defun touch (object)
+  "Protect OBJECT from compiler optimization."
+  (declare (ignore object))
+  (values))

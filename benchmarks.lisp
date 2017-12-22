@@ -36,13 +36,18 @@
   `(defstruct ,name
      ,@(loop for i below n
              collect
-             `(,(nth-slot i) 0 :type fixnum))))
+             `(,(nth-slot i) 42 :type fixnum))))
+
+(defclass A () ())
+(defclass B (A) ())
+(defclass C (A) ())
+(defclass D (B C) ())
 
 (defmacro n-slot-class (name n)
-  `(defclass ,name ()
+  `(defclass ,name (D)
      ,(loop for i below n
             collect
-            `(,(nth-slot i) :type fixnum :initform 0))))
+            `(,(nth-slot i) :type fixnum :initform 42))))
 
 (defmacro n-arg-defun (name n)
   (let ((args (loop for i below n collect (nth-arg i))))
@@ -132,8 +137,8 @@
              (as-time slope)))
   ;; MAKE-INSTANCE
   ;; CLOS warmup
-  (loop repeat 100 do (touch (make-instance  '0-slot-class)))
-  (loop repeat 100 do (touch (make-instance '50-slot-class)))
+  (loop repeat 10 do (touch (make-instance  '0-slot-class)))
+  (loop repeat 10 do (touch (make-instance '50-slot-class)))
   (let* (( y0 (benchmark (make-instance '0-slot-class)))
          (y50 (benchmark (make-instance '50-slot-class)))
          (slope (/ (- y50 y0) 50)))
