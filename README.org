@@ -24,12 +24,19 @@ To run all benchmarks, simply execute
 (asdf:test-system :the-cost-of-nothing)
 #+END_SRC
 
-To obtain the execution time of an expression in seconds, type
+To obtain the execution time of an expression as a double-float in seconds,
+execute
 #+BEGIN_SRC lisp
 (benchmark EXPRESSION)
 #+END_SRC
 
-To measure only certain parts of an expression, type
+To have said execution time immediately and human-readably written to
+*trace-output* (much like CL:TIME), use
+#+BEGIN_SRC lisp
+(bench EXPRESSION)
+#+END_SRC
+
+To measure only some parts of an expression, type
 #+BEGIN_SRC lisp
 (nested-benchmark
   (foo)
