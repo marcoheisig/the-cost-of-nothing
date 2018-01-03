@@ -47,8 +47,22 @@ To measure only some parts of an expression, type
 #+END_SRC
 
 Furthermore the library exports the following functions
+- TOUCH
 - MEASURE-EXECUTION-TIME
 - MEASURE-EXECUTION-TIME-OF-THUNK
+- WRITE-SI-UNIT
+- QUANTITY-STRING
+
+And some functions to register and query benchmarks:
+- DEFINE-BENCHMARK
+- QUERY-BENCHMARKS
+- PRINT-BENCHMARK-RESULTS
+- SHOW-BENCHMARK-RESULTS
+- SHOW-BENCHMARK-RESULTS!
+
+Note: The set of exported symbols might change over time, especially the
+facilities for defining and running benchmarks. Please do not :USE this
+package and :IMPORT-FROM it instead.
 
 ** Implementation
 A statement like
