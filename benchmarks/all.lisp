@@ -9,4 +9,5 @@
    :the-cost-of-nothing/benchmarks/function-calls
    :the-cost-of-nothing/benchmarks/garbage-collection
    :the-cost-of-nothing/benchmarks/sequence-traversal
-   :the-cost-of-nothing/benchmarks/hash-tables))
+   :the-cost-of-nothing/benchmarks/hash-tables
+   :the-cost-of-nothing/benchmarks/numerics))

@@ -69,8 +69,6 @@
 
 (defgeneric generic-car+cdr (generic-list))
 
-(defgeneric generic-nil-count (sequence))
-
 (defclass generic-list () ())
 
 (defclass generic-cons (generic-list)
@@ -78,8 +76,6 @@
    (%cdr :initarg :cdr :accessor generic-cdr)))
 
 (defclass generic-null (generic-list) ())
-
-(defmethod generic-nil-count ((generic-null generic-null)) 0)
 
 (defmethod generic-car+cdr ((generic-null generic-null))
   (values generic-null generic-null))
@@ -97,12 +93,12 @@
               :cdr result)))
     result))
 
-(defmethod generic-nil-count ((generic-cons generic-cons))
+(defun count-nil (generic-cons)
   ;; Two CLOS optimizations are used here:
   ;; 1. CAR+CDR are accessed using a single generic function, cutting the
   ;;    dispatch overhead by 50%
   ;; 2. The protocol guarantees that the CDR of an instance of GENERIC-NULL
-  ;;    is EQ to it. Furthermore, since the argument to GENERIC-NIL-COUNT
+  ;;    is EQ to it. Furthermore, since the argument to COUNT-NIL
   ;;    must be a proper list, the termination test can be done using EQ.
   (loop with car = nil and cdr = nil
         for current = generic-cons then cdr
@@ -118,7 +114,7 @@
      "CLOS conses, generic car+cdr"
      1 (nested-benchmark
          (touch list-1)
-         (benchmark (generic-nil-count list-1)))
+         (benchmark (count-nil list-1)))
      50 (nested-benchmark
           (touch list-n)
-          (benchmark (generic-nil-count list-n))))))
+          (benchmark (count-nil list-n))))))

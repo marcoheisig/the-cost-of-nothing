@@ -21,10 +21,10 @@
             collect `(,(gensym) :type fixnum :initform 42))))
 
 (n-slot-struct  0-slot-struct  0)
-(n-slot-struct 50-slot-struct 50)
+(n-slot-struct 80-slot-struct 80)
 
 (n-slot-class  0-slot-class  0)
-(n-slot-class 50-slot-class 50)
+(n-slot-class 80-slot-class 80)
 
 (define-benchmark allocation (:allocation :consing)
   (let ((list-1-time
@@ -41,12 +41,12 @@
           (benchmark (make-array 2000 :element-type '(unsigned-byte 8))))
         (0-slot-struct-time
           (benchmark (make-0-slot-struct)))
-        (50-slot-struct-time
-          (benchmark (make-50-slot-struct)))
+        (80-slot-struct-time
+          (benchmark (make-80-slot-struct)))
         (0-slot-class-time
           (benchmark (make-instance '0-slot-class)))
-        (50-slot-class-time
-          (benchmark (make-instance '50-slot-class))))
+        (80-slot-class-time
+          (benchmark (make-instance '80-slot-class))))
     (lambda (stream)
       (flet ((report (x0 y0 x1 y1)
                (multiple-value-bind (y-intersection slope)
@@ -61,6 +61,6 @@
         (format stream "Allocating (unsigned-byte 8) vectors: ")
         (report 1 ub8-array-1-time 2000 ub8-array-2000-time)
         (format stream "Allocating structs: ")
-        (report 1 0-slot-struct-time 50 50-slot-struct-time)
+        (report 1 0-slot-struct-time 80 80-slot-struct-time)
         (format stream "Allocating classes: ")
-        (report 1 0-slot-class-time 50 50-slot-class-time)))))
+        (report 1 0-slot-class-time 80 80-slot-class-time)))))
