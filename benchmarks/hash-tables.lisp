@@ -33,19 +33,15 @@
             (benchmark-hash-table #'equalp keys))))
     (lambda (stream)
       (format stream "Cost of a single hash table lookup:~%")
-
       (format stream "EQ hash table: ~A~%"
               (quantity-string eq "seconds"))
-
       (format stream "EQL hash table: ~A~%"
               (quantity-string eql "seconds"))
-
       (multiple-value-bind (y-intersection slope)
           (y-intersection-and-slope 0 equal-0 100 equal-100)
         (format stream "EQUAL hash table: ~A and ~A per cons.~%"
                 (quantity-string y-intersection "seconds")
                 (quantity-string slope "seconds")))
-
       (multiple-value-bind (y-intersection slope)
           (y-intersection-and-slope 0 equalp-0 100 equalp-100)
         (format stream "EQUALP hash table: ~A and ~A per cons.~%"
