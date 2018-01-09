@@ -37,7 +37,7 @@
              length
              :element-type element-type
              :initial-element initial-element)))
-    (let ((flop/run (* 3 2 length))
+    (let ((flop/run (* 3 length))
           (time/run
             (etypecase initial-element
               (single-float
