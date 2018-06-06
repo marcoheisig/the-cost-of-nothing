@@ -24,8 +24,7 @@ To run all benchmarks, simply execute
 (asdf:test-system :the-cost-of-nothing)
 #+END_SRC
 
-To obtain the execution time of an expression as a double-float in seconds,
-execute
+To obtain the execution time of an expression in seconds, execute
 #+BEGIN_SRC lisp
 (benchmark EXPRESSION)
 #+END_SRC

@@ -14,19 +14,19 @@
 
 (in-package :the-cost-of-nothing/core/macros)
 
-(defmacro bench (&body body)
-  "Evaluate BODY multiple times and print the averaged execution time to
+(defmacro bench (form &rest args)
+  "Evaluate FORM multiple times and print the averaged execution time to
 *TRACE-OUTPUT*.
 
    Examples:
    (bench nil) => 0.00 nanoseconds
    (bench (make-hash-table)) => 247.03 nanoseconds"
   `(progn
-     (write-si-unit (benchmark ,@body) "seconds" *trace-output*)
+     (write-si-unit (benchmark ,form ,@args) "seconds" *trace-output*)
      (values)))
 
-(defmacro nbench (&body body)
-  "Evaluate BODY multiple times and print the averaged execution time of
+(defmacro nbench (form &rest args)
+  "Evaluate FORM multiple times and print the averaged execution time of
 all statements enclosed in BENCHMARK forms to *TRACE-OUTPUT*
 
 Example:
@@ -37,21 +37,21 @@ Example:
      (make-array 100)
      (benchmark (list 6)))) => 4.54 nanoseconds"
   `(progn
-     (write-si-unit (nested-benchmark ,@body) "seconds" *trace-output*)
+     (write-si-unit (nested-benchmark ,form ,@args) "seconds" *trace-output*)
      (values)))
 
-(defmacro benchmark (&body body)
-  "Execute BODY multiple times to accurately measure its execution time in
+(defmacro benchmark (form &rest args)
+  "Execute FORM multiple times to accurately measure its execution time in
 seconds. The returned values are literally the same as those from an
 invocation of MEASURE-EXECUTION-TIME with suitable lambdas.
 
 Examples:
- (benchmark (cons nil nil)) -> 3.3d-9 1.0 36995264
+ (benchmark (cons nil nil)) -> 3.3f-9 1.0 36995264
  (benchmark (gc :full t))   -> 0.031 0.9 90"
-  `(nested-benchmark (benchmark (progn ,@body))))
+  `(nested-benchmark (benchmark ,form ,@args)))
 
-(defmacro nested-benchmark (&body body)
-  "Execute BODY multiple times to accurately measure the execution time in
+(defmacro nested-benchmark (form &rest args)
+  "Execute FORM multiple times to accurately measure the execution time in
 seconds of all statements that appear within a BENCHMARK statement. The
 returned values are literally the same as those from an invocation of
 MEASURE-EXECUTION-TIME with suitable lambdas.
@@ -61,18 +61,18 @@ Examples:
       (loop for key across keys do
         (benchmark (gethash key table))))
     (length keys))
- -> 1.5527d-8"
+ -> 1.5527f-8"
   (with-gensyms (iterations)
     `(measure-execution-time
       (lambda (,iterations)
-        (loop :repeat ,iterations :do
-          (macrolet ((benchmark (form)
-                       `(touch ,form)))
-            ,@body)))
+        (loop repeat ,iterations do
+          (macrolet ((benchmark (form) `(touch ,form))
+                     (bench (form) `(touch ,form)))
+            ,form)))
       :overhead
       (lambda (,iterations)
-        (loop :repeat ,iterations :do
-          (macrolet ((benchmark (form)
-                        (declare (ignore form))
-                        `(touch nil)))
-            ,@body))))))
+        (loop repeat ,iterations do
+          (macrolet ((benchmark (form) (declare (ignore form)) `(touch nil))
+                     (bench (form) (declare (ignore form)) `(touch nil)))
+            ,form)))
+      ,@args)))

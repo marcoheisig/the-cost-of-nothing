@@ -16,7 +16,7 @@
       (loop for report-fn in report-fns do
         (funcall report-fn stream)))))
 
-(defvar n 40 "Length of sequences to benchmark.")
+(defparameter n 40 "Length of sequences to benchmark.")
 
 (defun sequence-traversal-report-fn (description x0 t0 x1 t1)
   (multiple-value-bind (y-intersection slope)
@@ -38,13 +38,15 @@
     (sequence-traversal-report-fn
      "Built-in lists, CL:LOOP"
      1 (nested-benchmark
-         (touch list-1)
-         (benchmark
-           (loop for elt in list-1 counting (null elt))))
+         (progn
+           (touch list-1)
+           (benchmark
+             (loop for elt in list-1 counting (null elt)))))
      n (nested-benchmark
-         (touch list-n)
-         (benchmark
-           (loop for elt in list-n counting (null elt)))))))
+         (progn
+           (touch list-n)
+           (benchmark
+             (loop for elt in list-n counting (null elt))))))))
 
 (defun list-and-count ()
   (let ((list-1 (make-list 1 :initial-element 42))
@@ -53,11 +55,13 @@
     (sequence-traversal-report-fn
      "Built-in lists, CL:COUNT"
      1 (nested-benchmark
-         (touch list-1)
-         (benchmark (count nil list-1)))
+         (progn
+           (touch list-1)
+           (benchmark (count nil list-1))))
      n (nested-benchmark
-         (touch list-n)
-         (benchmark (count nil list-n))))))
+         (progn
+           (touch list-n)
+           (benchmark (count nil list-n)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -111,10 +115,12 @@
   (let ((list-1 (make-generic-list 1 :initial-element 42))
         (list-n (make-generic-list n :initial-element 42)))
     (sequence-traversal-report-fn
-     "CLOS conses, generic car+cdr"
+     "generic conses, generic car+cdr"
      1 (nested-benchmark
-         (touch list-1)
-         (benchmark (count-nil list-1)))
-     50 (nested-benchmark
-          (touch list-n)
-          (benchmark (count-nil list-n))))))
+         (progn
+           (touch list-1)
+           (benchmark (count-nil list-1))))
+     n (nested-benchmark
+         (progn
+           (touch list-n)
+           (benchmark (count-nil list-n)))))))

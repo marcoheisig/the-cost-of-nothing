@@ -13,9 +13,10 @@
     (loop for key across keys do
       (setf (gethash key table) nil))
     (/ (nested-benchmark
-         (touch keys)
-         (loop for key across keys do
-           (benchmark (gethash key table))))
+         (progn
+           (touch keys)
+           (loop for key across keys do
+             (benchmark (gethash key table)))))
        (length keys))))
 
 (define-benchmark hash-tables (:hash-tables)

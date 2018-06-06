@@ -8,12 +8,14 @@
 (define-benchmark garbage-collection (:gc)
   (let ((gc-time
           (nested-benchmark
-            (touch (make-list 10))
-            (benchmark (gc))))
+            (progn
+              (touch (make-list 10))
+              (benchmark (gc)))))
         (full-gc-time
           (nested-benchmark
-            (touch (make-list 10))
-            (benchmark (gc :full t)))))
+            (progn
+              (touch (make-list 10))
+              (benchmark (gc :full t))))))
     (lambda (stream)
       (format stream "~A for (GC), ~A for (GC :FULL T).~%"
               (quantity-string gc-time "seconds")

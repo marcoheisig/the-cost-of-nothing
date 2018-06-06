@@ -51,7 +51,7 @@ all benchmarks."
   (or (gethash benchmark-name *memoization-table*)
       (run-benchmark! benchmark-name)))
 
-(defun print-benchmark-results (&key tags stream force)
+(defun print-benchmark-results (&key (tags '()) (stream t) (force nil))
   (flet ((report (benchmark-name)
            (check-type benchmark-name symbol)
            (let ((report-fn

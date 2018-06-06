@@ -11,7 +11,7 @@ collection, sequence traversal, CLOS and floating-point performance."
   :depends-on ("the-cost-of-nothing/core/all"
                "the-cost-of-nothing/benchmarks/all")
   :perform
-  (test-op (o c) (symbol-call "THE-COST-OF-NOTHING" "SHOW-BENCHMARK-RESULTS")))
+  (test-op (o c) (uiop:symbol-call "THE-COST-OF-NOTHING" "SHOW-BENCHMARK-RESULTS!")))
 
 (register-system-packages "the-cost-of-nothing/benchmarks/all" '(:the-cost-of-nothing/benchmarks))
 (register-system-packages "the-cost-of-nothing/core/all" '(:the-cost-of-nothing/core))
