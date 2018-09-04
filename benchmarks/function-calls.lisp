@@ -16,17 +16,17 @@
     `(progn
        (declaim (notinline ,name))
        (defun ,name (,@args)
-         (declare (ignore ,@args))))))
+         (or ,@args)))))
 
 (defmacro n-arg-defmethod (name n)
   (let ((args (loop for i below n collect (nth-arg i))))
     `(defgeneric ,name (,@args)
-       (:method (,@args) (declare (ignore ,@args))))))
+       (:method (,@args)
+         (or ,@args)))))
 
 (defmacro n-keyword-defun (name n)
   (let ((args (loop for i below n collect (nth-arg i))))
     `(defun ,name (&key ,@args)
-       ;; pretend to use the arguments to trigger keyword parsing
        (or ,@args))))
 
 (defmacro n-arg-call (n function)
