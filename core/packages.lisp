@@ -1,5 +1,3 @@
-;;; © 2016-2018 Marco Heisig - licensed under GPLv3, see the file COPYING
-
 (cl:in-package #:common-lisp-user)
 
 (defpackage #:the-cost-of-nothing
