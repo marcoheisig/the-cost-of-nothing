@@ -6,13 +6,33 @@ comes bundled with an extensive test suite that describes the performance
 of the currently used Lisp implementation, e.g. with respect to garbage
 collection, sequence traversal, CLOS and floating-point performance."
   :author "Marco Heisig <marco.heisig@fau.de>"
-  :license "GPLv3"
-  :class :package-inferred-system
-  :depends-on ("the-cost-of-nothing/core/all"
-               "the-cost-of-nothing/benchmarks/all")
-  :perform
-  (test-op (o c) (symbol-call "THE-COST-OF-NOTHING" "SHOW-BENCHMARK-RESULTS")))
+  :license "MIT"
 
-(register-system-packages "the-cost-of-nothing/benchmarks/all" '(:the-cost-of-nothing/benchmarks))
-(register-system-packages "the-cost-of-nothing/core/all" '(:the-cost-of-nothing/core))
-(register-system-packages "closer-mop" '(:closer-common-lisp))
+  :depends-on
+  ("alexandria"
+   "closer-mop"
+   "fare-memoization"
+   "local-time"
+   "trivial-garbage")
+
+  :perform
+  (test-op (o c) (symbol-call '#:the-cost-of-nothing '#:report))
+  :components
+
+  ((:module "core"
+    :serial t
+    :components
+    ((:file "packages")
+     (:file "utilities")
+     (:file "time")
+     (:file "monitoring")
+     (:file "benchmarking")
+     (:file "time-series")))
+
+   (:module "benchmarks"
+    :serial t
+    :components
+    ((:file "memory-management")
+     (:file "function-calls")
+     (:file "numerics")
+     (:file "report")))))
