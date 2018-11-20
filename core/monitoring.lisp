@@ -6,36 +6,34 @@
 (defvar *measurements* nil
   "An object suitable as a second argument to STORE-MEASUREMENT.")
 
-(defclass measurement ()
-  ((%value :initarg :value :reader measurement-value)
-   (%name :initarg :name :reader measurement-name)
-   (%context :initarg :context :reader measurement-context)
-   (%timestamp :initarg :timestamp :reader measurement-timestamp))
-  (:default-initargs
-   :value nil
-   :name nil
-   :context *context*
-   :timestamp (make-timestamp)))
+(defstruct (measurement
+            (:predicate measurementp)
+            (:constructor make-measurement (value name)))
+  (value nil)
+  (name nil)
+  (context *context*)
+  (timestamp (make-timestamp)))
 
-(defgeneric measure (value name class storage)
-  (:argument-precedence-order storage value class name)
-  (:method ((value t) (name t) (class t) (storage null))
-    (declare (ignore value name class storage))
-    (values))
-  (:documentation
-  "Create an instance of CLASS with the given NAME and VALUE and store it
-in STORAGE.  CLASS must be a subtype of MEASUREMENT."))
-
-(defmacro monitor (form &key (name `',form) (class ''measurement))
-  "Monitor VALUE by storing a measurement in *MEASUREMENTS*.
+(defmacro monitor (form &key (name `',form))
+  "Monitor VALUE by storing a measurement in *MEASUREMENTS*.  If
+*MEASUREMENTS* is NIL, no measurement is recorded.
 
 The keyword argument NAME can be used to describe the nature of the
 measurement.  The default name of an measurement is the VALUE form that is
-the first argument of this macro.
+the first argument of this macro."
+  (let((value (gensym)))
+    `(let ((,value ,form))
+       (%monitor ,value ,name)
+       ,value)))
 
-The keyword argument CLASS can be used to specify the class of the
-measurement object.  It defaults to the class MEASUREMENT."
-  `(measure ,form ,name ,class *measurements*))
+(defun %monitor (value name)
+  (let ((storage *measurements*))
+    (unless (null storage)
+      (let ((measurement (make-measurement value name)))
+        (store-measurement measurement storage))))
+  (values))
+
+(defgeneric store-measurement (measurement storage))
 
 (defmethod print-object ((measurement measurement) stream)
   (if *print-pretty*
@@ -54,28 +52,28 @@ measurement object.  It defaults to the class MEASUREMENT."
 ;;;
 ;;; Monitoring Regions
 
-(defclass monitoring-region-start (measurement)
-  ((%value :initarg :end :reader monitoring-region-end))
-  (:documentation
-   "An measurement that is only emitted when entering a monitoring region. Its
-value is the corresponding monitoring region end, or NIL, when the region is
-still active."))
+(defstruct (monitoring-region-start
+            (:include measurement)
+            (:constructor make-monitoring-region-start (name)))
+  "A measurement that is only emitted when entering a monitoring
+region. Its value is the corresponding monitoring region end, or NIL, when
+the region is still active.")
 
-(defclass monitoring-region-end (measurement)
-  ((%value :initarg :start :reader monitoring-region-start))
-  (:documentation
-   "An measurement that is only emitted when leaving a monitoring region.
-Its value is the corresponding monitoring region start."))
+(defstruct (monitoring-region-end
+            (:include measurement)
+            (:constructor make-monitoring-region-end (name start)))
+  "A measurement that is only emitted when leaving a monitoring region.
+Its value is the corresponding monitoring region start.")
 
 (defun call-with-monitoring-region (name thunk)
   (let* ((*measurements* *measurements*)
-         (start (make-instance 'monitoring-region-start :name name :end nil)))
+         (start (make-monitoring-region-start name)))
     (store-measurement start *measurements*)
     (unwind-protect
          (let ((*context* (cons name *context*)))
            (funcall thunk))
-      (let ((end (make-instance 'monitoring-region-end :name name :start start)))
-        (setf (slot-value start '%value) end)
+      (let ((end (make-monitoring-region-end name start)))
+        (setf (measurement-value start) end)
         (store-measurement end *measurements*)))))
 
 (defmacro with-monitoring-region ((name) &body body)
