@@ -24,7 +24,7 @@ collection, sequence traversal, CLOS and floating-point performance."
     :components
     ((:file "packages")
      (:file "utilities")
-     (:file "time")
+     (:file "timestamps")
      (:file "monitoring")
      (:file "benchmarking")
      (:file "time-series")))
