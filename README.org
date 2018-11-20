@@ -12,7 +12,7 @@ the cost of certain actions on a given platform and implementation.
 I hope you find it useful. If you have new ideas for benchmarks, or
 suggestions on how to improve existing ones, feel free to contact me.
 
-** Usage
+** Benchmarking
 To run all predefined benchmarks, simply execute
 
 #+BEGIN_SRC lisp :results output
@@ -26,31 +26,14 @@ execute
 #+END_SRC
 
 To have said execution time immediately and human-readably written to
-*trace-output* (much like CL:TIME), use
+*trace-output* (much like CL:TIME), execute
 #+BEGIN_SRC lisp
 (bench EXPRESSION)
 #+END_SRC
 
-** Implementation
-A statement like
-#+BEGIN_SRC lisp
-(benchmark
- (loop for key across keys do
-   (benchmark (gethash key table))))
-#+END_SRC
+** Monitoring
 
-is a macro that expands into something like
-#+BEGIN_SRC lisp
-(benchmark-thunk
- (lambda (#:iterations723)
-   (loop :repeat #:iterations723
-         :do (loop for key across keys
-                   do (touch (gethash key table))))))
-#+END_SRC
-
-The function TOUCH is explicitly declared notinline, to prevent compiler
-optimization. The function BENCHMARK-THUNK invokes its argument repeatedly
-and with various numbers of iterations to determine an accurate result.
+Coming soon.
 
 ** Remember
 

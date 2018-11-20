@@ -4,12 +4,15 @@
   (:use #:closer-common-lisp)
   (:export
 
+   ;; Utilities
+   #:write-si-unit
+   #:print-time
+
    ;; Benchmarking
    #:touch
    #:bench
    #:benchmark
    #:benchmark-thunk
-   #:print-time
 
    ;; Monitoring
    #:measurement
@@ -18,17 +21,17 @@
    #:measurement-context
    #:measurement-timestamp
    #:make-measurement
+   #:measurementp
    #:monitor
-   #:measure
    #:with-monitoring-region
-   #:call-with-monitoring-region
    #:monitoring-region-start
    #:monitoring-region-end
 
    ;; Predefined Benchmarks
-   #:report
-   #:flops
+   #:print-report
+   #:funcall-cost
    #:cons-cost
+   #:gc-cost
    #:make-list-cost
    #:make-sequence-cost
-   #:funcall-cost))
+   #:flops))
