@@ -1,6 +1,6 @@
 (in-package :the-cost-of-nothing)
 
-(declaim (type (function () local-time:timestamp) *timestamp-function*))
+(declaim (function *timestamp-function*))
 (defvar *timestamp-function* #'local-time:now)
 
 (declaim (inline make-timestamp))
@@ -32,12 +32,3 @@ returns the same timestamp for the given number of consecutive calls."
                      (incf counter)
                      cache)))))
       (funcall thunk))))
-
-(defun execution-time-of-thunk (thunk)
-  "Execute THUNK and return the execution time of THUNK in seconds as a
-double-float."
-  (let* ((t0 (local-time:now))
-         (_  (funcall thunk))
-         (t1 (local-time:now)))
-    (declare (ignore _))
-    (local-time:timestamp-difference t1 t0)))

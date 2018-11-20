@@ -24,12 +24,7 @@ Examples:
  (benchmark (cons nil nil)) -> 3.3d-9 1.0 36995264
  (benchmark (gc :full t))   -> 0.031 0.9 90"
   (declare (ignore max-samples min-sample-time timeout overhead))
-  (let ((iterations (gensym "ITERATIONS")))
-    `(benchmark-thunk
-      (lambda (,iterations)
-        (loop repeat ,iterations do
-          (touch ,form)))
-      ,@args)))
+  `(benchmark-thunk (lambda () ,form) ,@args))
 
 (defvar *default-overhead*)
 
@@ -51,5 +46,25 @@ Examples:
                          (>= number-of-samples max-samples))))
     (- (/ (reduce #'+ samples) number-of-samples)
        overhead)))
+
+(defun sample-execution-time-of-thunk (thunk min-sample-time)
+  "Measure the execution time of invoking THUNK more and more often, until
+the execution time exceeds MIN-SAMPLE-TIME."
+  (loop for iterations = 1 then (1+ (* iterations (1+ (random 4))))
+        for execution-time = (max 0.0d0 (execution-time-of-thunk
+                                         (lambda ()
+                                           (loop repeat iterations do
+                                             (funcall thunk)))))
+        when (> execution-time min-sample-time)
+          do (return (/ execution-time iterations))))
+
+(defun execution-time-of-thunk (thunk)
+  "Execute THUNK and return the execution time of THUNK in seconds as a
+double-float."
+  (let* ((t0 (local-time:now))
+         (_  (funcall thunk))
+         (t1 (local-time:now)))
+    (declare (ignore _))
+    (max 0.0d0 (local-time:timestamp-difference t1 t0))))
 
 (defvar *default-overhead* (benchmark nil :timeout 2.0 :overhead 0))
