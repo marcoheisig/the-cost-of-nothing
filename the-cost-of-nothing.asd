@@ -16,7 +16,7 @@ collection, sequence traversal, CLOS and floating-point performance."
    "trivial-garbage")
 
   :perform
-  (test-op (o c) (symbol-call '#:the-cost-of-nothing '#:report))
+  (test-op (o c) (symbol-call '#:the-cost-of-nothing '#:print-report))
   :components
 
   ((:module "core"
@@ -33,6 +33,6 @@ collection, sequence traversal, CLOS and floating-point performance."
     :serial t
     :components
     ((:file "memory-management")
-     (:file "function-calls")
+     (:file "functions")
      (:file "numerics")
      (:file "report")))))

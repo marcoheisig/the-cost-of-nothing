@@ -1,7 +1,7 @@
 (in-package :the-cost-of-nothing)
 
-(defun report (&key (stream *standard-output*))
-  (format stream "~&~%= The Cost Of Nothing - System Report =~%")
+(defun print-report (&optional (stream *standard-output*))
+  (format stream "~&~%= The Cost Of Nothing =~%")
   (format stream "Implementation: ~:[unknown~;~:*~a~]~@[ ~a~]~%"
           (lisp-implementation-type)
           (lisp-implementation-version))
@@ -9,7 +9,9 @@
           (machine-type)
           (machine-version))
   (format stream "Hostname: ~a~%" (machine-instance))
-  ;; TODO report benchmark results.
+  (print-memory-management-report stream)
+  (print-functions-report stream)
+  (print-numerics-report stream)
   (values))
 
 (defun y-intersection-and-slope (x0 y0 x1 y1)

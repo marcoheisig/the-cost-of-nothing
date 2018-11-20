@@ -40,7 +40,7 @@
 
 (defun print-time (time &optional (stream *standard-output*))
   (write-si-unit time "seconds" stream)
-  (values))
+  time)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;

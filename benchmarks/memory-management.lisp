@@ -28,3 +28,12 @@
 (define-memo-function gc-cost (&key full)
   (benchmark
    (trivial-garbage:gc :full full)))
+
+(defun print-memory-management-report (&optional (stream *standard-output*))
+  (format stream "~&~%== Memory Management ==~%")
+  (format stream "Cost of allocating a cons cell: ") (finish-output stream)
+  (print-time (cons-cost) stream) (terpri stream) (finish-output stream)
+  (format stream "Cost of garbage collection: ") (finish-output stream)
+  (print-time (gc-cost) stream) (terpri stream) (finish-output stream)
+  (format stream "Cost of full garbage collection: ") (finish-output stream)
+  (print-time (gc-cost :full t) stream) (terpri stream) (finish-output stream))
