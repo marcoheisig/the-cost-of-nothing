@@ -64,7 +64,7 @@ the region is still active.")
 
 (defstruct (monitoring-region-end
             (:include measurement)
-            (:constructor make-monitoring-region-end (name start)))
+            (:constructor make-monitoring-region-end (name value)))
   "A measurement that is only emitted when leaving a monitoring region.
 Its value is the corresponding monitoring region start.")
 
