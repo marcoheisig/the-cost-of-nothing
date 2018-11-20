@@ -31,7 +31,7 @@ Examples:
           (touch ,form)))
       ,@args)))
 
-(defvar *default-overhead* 0.0d0)
+(defvar *default-overhead*)
 
 (defvar *default-min-sample-time* 0.05)
 
@@ -52,4 +52,4 @@ Examples:
     (- (/ (reduce #'+ samples) number-of-samples)
        overhead)))
 
-(setf *default-overhead* (benchmark nil :timeout 2.0 :overhead 0))
+(defvar *default-overhead* (benchmark nil :timeout 2.0 :overhead 0))
