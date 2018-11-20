@@ -11,7 +11,6 @@ collection, sequence traversal, CLOS and floating-point performance."
   :depends-on
   ("alexandria"
    "closer-mop"
-   "fare-memoization"
    "local-time"
    "trivial-garbage")
 

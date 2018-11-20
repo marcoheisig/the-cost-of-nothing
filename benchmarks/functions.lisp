@@ -1,6 +1,6 @@
 (in-package :the-cost-of-nothing)
 
-(fmemo:define-memo-function funcall-cost
+(define-memo-function funcall-cost
     (&key (mandatory-arguments 0)
           (optional-arguments 0)
           (keyword-arguments 0)
