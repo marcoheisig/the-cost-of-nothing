@@ -33,7 +33,10 @@ the first argument of this macro."
         (store-measurement measurement storage))))
   (values))
 
-(defgeneric store-measurement (measurement storage))
+(defgeneric store-measurement (measurement storage)
+  (:method (measurement (null null))
+    (declare (ignore measurement))
+    (values)))
 
 (defmethod print-object ((measurement measurement) stream)
   (if *print-pretty*
@@ -65,17 +68,6 @@ the region is still active.")
   "A measurement that is only emitted when leaving a monitoring region.
 Its value is the corresponding monitoring region start.")
 
-(defun call-with-monitoring-region (name thunk)
-  (let* ((*measurements* *measurements*)
-         (start (make-monitoring-region-start name)))
-    (store-measurement start *measurements*)
-    (unwind-protect
-         (let ((*context* (cons name *context*)))
-           (funcall thunk))
-      (let ((end (make-monitoring-region-end name start)))
-        (setf (measurement-value start) end)
-        (store-measurement end *measurements*)))))
-
 (defmacro with-monitoring-region ((name) &body body)
   "Execute BODY in a region monitoring NAME.  This entails the following things:
 
@@ -93,6 +85,17 @@ Its value is the corresponding monitoring region start.")
    outside of BODY.  Its value is the corresponding MONITORING-REGION-START
    measurement."
   `(call-with-monitoring-region ',name (lambda () ,@body)))
+
+(defun call-with-monitoring-region (name thunk)
+  (let* ((*measurements* *measurements*)
+         (start (make-monitoring-region-start name)))
+    (store-measurement start *measurements*)
+    (unwind-protect
+         (let ((*context* (cons name *context*)))
+           (funcall thunk))
+      (let ((end (make-monitoring-region-end name start)))
+        (setf (measurement-value start) end)
+        (store-measurement end *measurements*)))))
 
 (defmethod print-object ((monitoring-region-start monitoring-region-start) stream)
   (print-unreadable-object (monitoring-region-start stream :type t)
