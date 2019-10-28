@@ -13,7 +13,8 @@
    (bench nil) => 0.00 nanoseconds
    (bench (make-hash-table)) => 247.03 nanoseconds"
   (declare (ignore max-samples min-sample-time timeout overhead))
-  `(print-time (benchmark ,form ,@args) *trace-output*))
+  `(progn (print-time (benchmark ,form ,@args) *trace-output*)
+          (values)))
 
 (defmacro benchmark (form &rest args &key max-samples min-sample-time timeout overhead)
   "Execute BODY multiple times to accurately measure its execution time in
@@ -44,7 +45,8 @@ Examples:
           until (or (local-time:timestamp>= (local-time:now) tmax)
                     (and (not (null max-samples))
                          (>= number-of-samples max-samples))))
-    (- (/ (reduce #'+ samples) number-of-samples)
+    (- (/ (reduce #'+ samples)
+          (coerce number-of-samples 'single-float))
        overhead)))
 
 (defun sample-execution-time-of-thunk (thunk min-sample-time)
@@ -67,4 +69,4 @@ double-float."
     (declare (ignore _))
     (max 0.0d0 (local-time:timestamp-difference t1 t0))))
 
-(defvar *default-overhead* (benchmark nil :timeout 2.0 :overhead 0))
+(defvar *default-overhead* (benchmark nil :timeout 2.0 :overhead 0.0))
